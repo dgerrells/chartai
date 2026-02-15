@@ -1,0 +1,12 @@
+{
+  "name": "integration-demo",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run server.ts"
+  },
+  "dependencies": {
+    "chartai": "^0.0.1"
+  }
+}

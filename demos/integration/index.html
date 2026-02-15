@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChartAI - Integration Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 1.2em;
+      opacity: 0.9;
+    }
+
+    .status {
+      text-align: center;
+      padding: 20px;
+      margin-bottom: 30px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #333;
+    }
+
+    .status.success {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .status.error {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.secondary:hover {
+      background: #4b5563;
+    }
+
+    .tests {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .test-card {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .test-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .test-title {
+      font-size: 1.2em;
+      font-weight: 600;
+    }
+
+    .test-status {
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .test-status.pending {
+      background: #374151;
+      color: #9ca3af;
+    }
+
+    .test-status.pass {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+
+    .test-status.fail {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    .chart-container {
+      width: 100%;
+      height: 300px;
+      background: #0a0a0a;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    .test-info {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .summary {
+      text-align: center;
+      padding: 30px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #333;
+    }
+
+    .summary h2 {
+      margin-bottom: 15px;
+    }
+
+    .summary-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2em;
+      font-weight: bold;
+    }
+
+    .stat-label {
+      font-size: 0.9em;
+      color: #9ca3af;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧪 ChartAI Integration Test</h1>
+    <div class="subtitle">Testing NPM package exports and core functionality</div>
+  </div>
+
+  <div id="status" class="status">
+    <div id="status-text">Initializing...</div>
+  </div>
+
+  <div class="controls">
+    <button id="run-tests">Run All Tests</button>
+    <button id="toggle-theme" class="secondary">Toggle Theme</button>
+    <button id="clear-all" class="secondary">Clear All</button>
+  </div>
+
+  <div id="tests" class="tests"></div>
+
+  <div id="summary" class="summary" style="display: none;">
+    <h2>Test Summary</h2>
+    <div class="summary-stats">
+      <div class="stat">
+        <div class="stat-value" id="total-tests">0</div>
+        <div class="stat-label">Total Tests</div>
+      </div>
+      <div class="stat" style="color: #10b981;">
+        <div class="stat-value" id="passed-tests">0</div>
+        <div class="stat-label">Passed</div>
+      </div>
+      <div class="stat" style="color: #ef4444;">
+        <div class="stat-value" id="failed-tests">0</div>
+        <div class="stat-label">Failed</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

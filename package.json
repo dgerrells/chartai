@@ -1,0 +1,78 @@
+{
+  "name": "chartai",
+  "version": "0.0.1",
+  "description": "tiny gpu powered charts",
+  "type": "module",
+  "main": "./dist/chart-library.js",
+  "module": "./dist/chart-library.js",
+  "types": "./dist/chart-library.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/chart-library.d.ts",
+      "default": "./dist/chart-library.js"
+    },
+    "./worker": {
+      "types": "./dist/gpu-worker.d.ts",
+      "default": "./dist/gpu-worker.js"
+    },
+    "./plugins/hover": {
+      "types": "./dist/hover.d.ts",
+      "default": "./dist/hover.js"
+    },
+    "./plugins/labels": {
+      "types": "./dist/labels.d.ts",
+      "default": "./dist/labels.js"
+    },
+    "./plugins/zoom": {
+      "types": "./dist/zoom.d.ts",
+      "default": "./dist/zoom.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "bun run server.ts",
+    "clean": "rm -rf dist docs",
+    "prebuild": "bun run clean",
+    "build:lib": "bun run clean && bun run build.ts lib",
+    "build:pages": "bun run clean && bun run build.ts pages",
+    "build": "bun run build.ts all",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "prepublishOnly": "bun run build:lib"
+  },
+  "keywords": [
+    "webgpu",
+    "chart",
+    "charts",
+    "visualization",
+    "data-viz",
+    "canvas",
+    "gpu",
+    "performance",
+    "scatter",
+    "line",
+    "bar"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dgerrells/chartai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dgerrells/chartai/issues"
+  },
+  "homepage": "https://dgerrells.github.io/chartai/",
+  "peerDependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
