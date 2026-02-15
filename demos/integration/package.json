@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "chartai": "^0.0.6"
+    "chartai": "^0.0.7"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
