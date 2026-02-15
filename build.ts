@@ -22,19 +22,19 @@ async function generateTypes() {
     "--project",
     path.join(ROOT, "tsconfig.json"),
   ]);
-  
+
   if (result.exitCode !== 0) {
     console.error("❌ Type generation failed:");
     console.error(result.stderr.toString());
     process.exit(1);
   }
-  
+
   // Remove shaders .d.ts files (internal only, not part of public API)
   const shadersDir = path.join(DIST, "shaders");
   if (fs.existsSync(shadersDir)) {
     fs.rmSync(shadersDir, { recursive: true, force: true });
   }
-  
+
   console.log("✅ Type declarations generated");
 }
 
@@ -44,7 +44,7 @@ const shaderMinifierPlugin = {
   setup(build: any) {
     build.onLoad({ filter: /shaders\/.*\.ts$/ }, async (args: any) => {
       const source = await Bun.file(args.path).text();
-      
+
       // Minify shader template strings
       const minified = source.replace(
         /(export const \w+ = `)([^`]+)(`)/g,
@@ -64,11 +64,11 @@ const shaderMinifierPlugin = {
           minifiedShader = minifiedShader.replace(/ *([{}();,]) */g, "$1");
           // Trim the final result
           minifiedShader = minifiedShader.trim();
-          
+
           return prefix + minifiedShader + suffix;
-        }
+        },
       );
-      
+
       return {
         contents: minified,
         loader: "ts",
@@ -141,7 +141,7 @@ async function buildLib() {
     for (const item of fs.readdirSync(dir)) {
       const srcPath = path.join(dir, item);
       const stat = fs.statSync(srcPath);
-      
+
       if (stat.isDirectory()) {
         const newOutDir = path.join(outDir, item);
         fs.mkdirSync(newOutDir, { recursive: true });
@@ -172,7 +172,7 @@ async function buildLib() {
     .filter((f) => fs.existsSync(f))
     .map((f) => `  ${fileSize(f)}`);
   console.log(`✅ dist/\n${files.join("\n")}`);
-  
+
   // Generate TypeScript declarations
   await generateTypes();
 }
@@ -212,7 +212,10 @@ async function buildPages() {
   }
 
   // Copy CSS (demo needs it for the UI shell)
-  fs.copyFileSync(path.join(ROOT, "pages", "chart.css"), path.join(PAGES, "chart.css"));
+  fs.copyFileSync(
+    path.join(ROOT, "pages", "chart.css"),
+    path.join(PAGES, "chart.css"),
+  );
 
   // Copy index.html with paths fixed for compiled output
   let html = fs.readFileSync(path.join(ROOT, "pages", "index.html"), "utf-8");
@@ -260,16 +263,19 @@ async function buildCanvasDemo() {
   // Copy CSS
   fs.copyFileSync(
     path.join(ROOT, "demos", "canvas", "src", "canvas.css"),
-    path.join(CANVAS_OUT, "canvas.css")
+    path.join(CANVAS_OUT, "canvas.css"),
   );
 
   // Copy index.html with paths fixed for compiled output
   let html = fs.readFileSync(
     path.join(ROOT, "demos", "canvas", "src", "index.html"),
-    "utf-8"
+    "utf-8",
   );
   html = html.replace('src="/demos/canvas/src/main.ts"', 'src="./main.js"');
-  html = html.replace('href="/demos/canvas/src/canvas.css"', 'href="./canvas.css"');
+  html = html.replace(
+    'href="/demos/canvas/src/canvas.css"',
+    'href="./canvas.css"',
+  );
   fs.writeFileSync(path.join(CANVAS_OUT, "index.html"), html);
 
   console.log("✅ docs/canvas/  (Canvas demo ready)");
