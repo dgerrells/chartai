@@ -120,6 +120,16 @@ async function buildLib() {
     process.exit(1);
   }
 
+  // Post-build fix for Bun's duplicate export bug (issue #5344, #10631)
+  // you're killing me smalls, bun i love you but jfc this one sucked.
+  const libPath = path.join(DIST, "chart-library.js");
+  if (fs.existsSync(libPath)) {
+    let content = fs.readFileSync(libPath, "utf-8");
+    // Remove duplicate single-symbol exports (e.g., "export { ChartManager };")
+    content = content.replace(/\nexport\s*{\s*ChartManager\s*};\s*\n/g, "\n");
+    fs.writeFileSync(libPath, content);
+  }
+
   // Minified build → .min.js
   const minDir = path.join(DIST, "_min");
   fs.mkdirSync(minDir, { recursive: true });
