@@ -417,19 +417,11 @@ function createChart(
   maxSamplesPerPixel: number = 0,
   bgColor: [number, number, number] | null = null,
 ) {
-  if (!device) {
-    postMessage({
-      type: "error",
-      message: `Cannot create chart ${id}: GPU device not available`,
-    });
-    return;
-  }
-
-  const ctx = canvas.getContext("webgpu");
+  const ctx = device ? canvas.getContext("webgpu") : null;
   if (!ctx) {
     postMessage({
       type: "error",
-      message: `Cannot create chart ${id}: Failed to get WebGPU context`,
+      message: `Failed to initialize WebGPU context: ${id}`,
     });
     return;
   }
@@ -439,13 +431,15 @@ function createChart(
   } catch (e) {
     postMessage({
       type: "error",
-      message: `Cannot create chart ${id}: configure failed - ${e}`,
+      message: `Failed to configure WebGPU context: ${id}`,
+      err: e.toString(),
     });
     return;
   }
 
-  const width = canvas.width || 800;
-  const height = canvas.height || 400;
+  const limit = device.limits.maxTextureDimension2D;
+  const width = Math.min(Math.floor(Number(canvas.width) || 800), limit);
+  const height = Math.min(Math.floor(Number(canvas.height) || 400), limit);
 
   const uniformBuffer = device.createBuffer({
     size: 112,

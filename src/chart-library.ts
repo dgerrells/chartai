@@ -237,17 +237,21 @@ export class ChartManager {
     return new Promise((resolve) => {
       // Import inlined worker code for maximum compatibility
       // This works with all bundlers without any special configuration
-      import("./worker-inline.js").then(({ WORKER_CODE }) => {
-        const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
-        const workerUrl = URL.createObjectURL(blob);
-        this.worker = new Worker(workerUrl, { type: "module" });
-        this.setupWorkerHandlers(resolve);
-      }).catch(() => {
-        // Fallback to file-based worker if inline not available (shouldn't happen in production)
-        const workerUrl = new URL("./gpu-worker.js", import.meta.url);
-        this.worker = new Worker(workerUrl, { type: "module" });
-        this.setupWorkerHandlers(resolve);
-      });
+      import("./worker-inline.js")
+        .then(({ WORKER_CODE }) => {
+          const blob = new Blob([WORKER_CODE], {
+            type: "application/javascript",
+          });
+          const workerUrl = URL.createObjectURL(blob);
+          this.worker = new Worker(workerUrl, { type: "module" });
+          this.setupWorkerHandlers(resolve);
+        })
+        .catch(() => {
+          // Fallback to file-based worker if inline not available (shouldn't happen in production)
+          const workerUrl = new URL("./gpu-worker.js", import.meta.url);
+          this.worker = new Worker(workerUrl, { type: "module" });
+          this.setupWorkerHandlers(resolve);
+        });
     });
   }
 
