@@ -314,19 +314,24 @@ export class ChartManager {
     const el = document.createElement("div");
     el.className = "gpu-chart";
     el.dataset.chartId = id;
+    el.style.cssText = "width: 100%; height: 100%; position: relative;";
 
     const canvasWrap = document.createElement("div");
     canvasWrap.className = "gpu-chart-canvas-wrap";
     canvasWrap.dataset.chartId = id;
+    canvasWrap.style.cssText = "width: 100%; height: 100%; position: relative;";
 
     const backCanvas = document.createElement("canvas");
     backCanvas.className = "gpu-chart-back-canvas";
+    backCanvas.style.cssText = "position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;";
 
     const gpuCanvas = document.createElement("canvas");
     gpuCanvas.className = "gpu-chart-canvas";
+    gpuCanvas.style.cssText = "position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: auto; z-index: 1;";
 
     const axisCanvas = document.createElement("canvas");
     axisCanvas.className = "gpu-chart-axis-canvas";
+    axisCanvas.style.cssText = "position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2;";
 
     canvasWrap.appendChild(backCanvas);
     canvasWrap.appendChild(gpuCanvas);
