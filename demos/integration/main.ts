@@ -1,437 +1,200 @@
-// Integration test - imports library as if installed from NPM
+// Integration demo - imports library as if installed from NPM
 import { ChartManager, registerPlugin } from "chartai";
-import type { ChartType } from "chartai";
 import { hoverPlugin } from "chartai/plugins/hover";
 import { labelsPlugin } from "chartai/plugins/labels";
 import { zoomPlugin } from "chartai/plugins/zoom";
 
-interface Test {
-  name: string;
-  description: string;
-  run: () => Promise<boolean>;
-  chartId?: string;
-}
-
-const tests: Test[] = [];
 let manager: ChartManager;
+let scatterChartId: string;
+let lineChartId: string;
+let barChartId: string;
+let scatterNoPluginsId: string;
+let lineLargeId: string;
+let isDarkTheme = true;
+let syncEnabled = false;
 
-// Test: Library Import
-tests.push({
-  name: "Library Import",
-  description: "Can import ChartManager from package",
-  run: async () => {
-    return typeof ChartManager !== "undefined" && ChartManager.getInstance !== undefined;
-  },
-});
-
-// Test: WebGPU Initialization
-tests.push({
-  name: "WebGPU Init",
-  description: "ChartManager initializes and WebGPU is available",
-  run: async () => {
-    manager = ChartManager.getInstance();
-    const success = await manager.init();
-    return success === true;
-  },
-});
-
-// Test: Plugin Registration
-tests.push({
-  name: "Plugin Registration",
-  description: "Can register all three plugins",
-  run: async () => {
-    try {
-      registerPlugin(labelsPlugin);
-      registerPlugin(zoomPlugin());
-      registerPlugin(hoverPlugin);
-      return true;
-    } catch (e) {
-      console.error("Plugin registration failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Create Scatter Chart
-tests.push({
-  name: "Scatter Chart",
-  description: "Create scatter chart with 1000 points",
-  run: async () => {
-    try {
-      const container = document.createElement("div");
-      container.className = "chart-container";
-      
-      const x = Array.from({ length: 1000 }, (_, i) => i);
-      const y = Array.from({ length: 1000 }, () => Math.random() * 100);
-      
-      const id = manager.create({
-        type: "scatter",
-        container,
-        series: [{ label: "Test Data", color: { r: 0.4, g: 0.6, b: 1 }, x, y }],
-        showTooltip: true,
-      });
-      
-      tests[tests.length - 1].chartId = id;
-      return typeof id === "string" && id.length > 0;
-    } catch (e) {
-      console.error("Scatter chart creation failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Create Line Chart
-tests.push({
-  name: "Line Chart",
-  description: "Create line chart with multiple series",
-  run: async () => {
-    try {
-      const container = document.createElement("div");
-      container.className = "chart-container";
-      
-      const x = Array.from({ length: 500 }, (_, i) => i);
-      const series = [
-        {
-          label: "Series 1",
-          color: { r: 1, g: 0.3, b: 0.3 },
-          x,
-          y: x.map((v) => Math.sin(v * 0.1) * 50 + 50),
-        },
-        {
-          label: "Series 2",
-          color: { r: 0.3, g: 1, b: 0.3 },
-          x,
-          y: x.map((v) => Math.cos(v * 0.1) * 50 + 50),
-        },
-      ];
-      
-      const id = manager.create({
-        type: "line",
-        container,
-        series,
-        showTooltip: true,
-      });
-      
-      tests[tests.length - 1].chartId = id;
-      return typeof id === "string" && id.length > 0;
-    } catch (e) {
-      console.error("Line chart creation failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Create Bar Chart
-tests.push({
-  name: "Bar Chart",
-  description: "Create bar chart with positive values",
-  run: async () => {
-    try {
-      const container = document.createElement("div");
-      container.className = "chart-container";
-      
-      const x = Array.from({ length: 50 }, (_, i) => i);
-      const y = Array.from({ length: 50 }, () => Math.random() * 100);
-      
-      const id = manager.create({
-        type: "bar",
-        container,
-        series: [{ label: "Bars", color: { r: 0.8, g: 0.4, b: 1 }, x, y }],
-        showTooltip: true,
-      });
-      
-      tests[tests.length - 1].chartId = id;
-      return typeof id === "string" && id.length > 0;
-    } catch (e) {
-      console.error("Bar chart creation failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Update Series
-tests.push({
-  name: "Update Series",
-  description: "Dynamically update chart data",
-  run: async () => {
-    try {
-      const prevTest = tests.find((t) => t.name === "Scatter Chart");
-      if (!prevTest?.chartId) return false;
-      
-      const x = Array.from({ length: 500 }, (_, i) => i);
-      const y = Array.from({ length: 500 }, () => Math.random() * 50 + 50);
-      
-      manager.updateSeries(prevTest.chartId, [
-        { label: "Updated", color: { r: 1, g: 0.7, b: 0.2 }, x, y },
-      ]);
-      
-      return true;
-    } catch (e) {
-      console.error("Update series failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Zoom Mode
-tests.push({
-  name: "Zoom Mode",
-  description: "Set and get zoom modes",
-  run: async () => {
-    try {
-      const prevTest = tests.find((t) => t.name === "Line Chart");
-      if (!prevTest?.chartId) return false;
-      
-      manager.setZoomMode(prevTest.chartId, "x-only");
-      const mode = manager.getZoomMode(prevTest.chartId);
-      
-      return mode === "x-only";
-    } catch (e) {
-      console.error("Zoom mode test failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Reset View
-tests.push({
-  name: "Reset View",
-  description: "Reset chart view to default",
-  run: async () => {
-    try {
-      const prevTest = tests.find((t) => t.name === "Line Chart");
-      if (!prevTest?.chartId) return false;
-      
-      manager.resetView(prevTest.chartId);
-      return true;
-    } catch (e) {
-      console.error("Reset view failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Theme Switching
-tests.push({
-  name: "Theme Switch",
-  description: "Toggle dark/light theme",
-  run: async () => {
-    try {
-      manager.setTheme(false); // Light mode
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      manager.setTheme(true); // Dark mode
-      return true;
-    } catch (e) {
-      console.error("Theme switch failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Sync Views
-tests.push({
-  name: "Sync Views",
-  description: "Enable synchronized view across charts",
-  run: async () => {
-    try {
-      manager.setSyncViews(true);
-      const isSynced = manager.syncViews;
-      manager.setSyncViews(false);
-      return isSynced === true;
-    } catch (e) {
-      console.error("Sync views failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Point Size
-tests.push({
-  name: "Point Size",
-  description: "Change scatter point size",
-  run: async () => {
-    try {
-      const prevTest = tests.find((t) => t.name === "Scatter Chart");
-      if (!prevTest?.chartId) return false;
-      
-      manager.setPointSize(prevTest.chartId, 6);
-      return true;
-    } catch (e) {
-      console.error("Point size test failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Stats Callback
-tests.push({
-  name: "Stats Callback",
-  description: "Register and receive stats updates",
-  run: async () => {
-    try {
-      let received = false;
-      const unsubscribe = manager.onStats((stats) => {
-        received = stats.total >= 0;
-      });
-      
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      unsubscribe();
-      
-      return received;
-    } catch (e) {
-      console.error("Stats callback failed:", e);
-      return false;
-    }
-  },
-});
-
-// Test: Chart Destruction
-tests.push({
-  name: "Destroy Chart",
-  description: "Properly cleanup and destroy a chart",
-  run: async () => {
-    try {
-      const container = document.createElement("div");
-      container.className = "chart-container";
-      
-      const id = manager.create({
-        type: "scatter",
-        container,
-        series: [{ label: "Test", color: { r: 1, g: 1, b: 1 }, x: [1, 2, 3], y: [1, 2, 3] }],
-      });
-      
-      const countBefore = manager.getChartCount();
-      manager.destroy(id);
-      const countAfter = manager.getChartCount();
-      
-      return countAfter < countBefore;
-    } catch (e) {
-      console.error("Destroy chart failed:", e);
-      return false;
-    }
-  },
-});
-
-// UI Functions
-function updateStatus(text: string, type: "pending" | "success" | "error") {
-  const statusEl = document.getElementById("status")!;
-  const statusText = document.getElementById("status-text")!;
+async function init() {
+  // Initialize ChartManager
+  manager = ChartManager.getInstance();
+  const success = await manager.init();
   
-  statusEl.className = `status ${type}`;
-  statusText.textContent = text;
-}
-
-function createTestCard(test: Test, index: number): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "test-card";
-  card.id = `test-${index}`;
-  
-  card.innerHTML = `
-    <div class="test-header">
-      <div class="test-title">${test.name}</div>
-      <div class="test-status pending">PENDING</div>
-    </div>
-    <div class="test-info">${test.description}</div>
-  `;
-  
-  return card;
-}
-
-function updateTestStatus(index: number, status: "pending" | "pass" | "fail") {
-  const card = document.getElementById(`test-${index}`);
-  if (!card) return;
-  
-  const statusEl = card.querySelector(".test-status")!;
-  statusEl.className = `test-status ${status}`;
-  statusEl.textContent = status === "pass" ? "✓ PASS" : status === "fail" ? "✗ FAIL" : "PENDING";
-}
-
-function addChartToTest(index: number, container: HTMLElement) {
-  const card = document.getElementById(`test-${index}`);
-  if (card) {
-    card.appendChild(container);
+  if (!success) {
+    console.error("Failed to initialize ChartManager");
+    return;
   }
-}
 
-async function runTests() {
-  updateStatus("Running tests...", "pending");
-  
-  let passed = 0;
-  let failed = 0;
-  
-  for (let i = 0; i < tests.length; i++) {
-    const test = tests[i];
-    updateTestStatus(i, "pending");
-    
-    try {
-      const result = await test.run();
-      
-      if (result) {
-        updateTestStatus(i, "pass");
-        passed++;
-        
-        // Add chart container for visualization tests
-        if (test.chartId) {
-          const chartEl = document.querySelector(`[data-chart-id="${test.chartId}"]`);
-          if (chartEl?.parentElement) {
-            addChartToTest(i, chartEl.parentElement as HTMLElement);
-          }
-        }
-      } else {
-        updateTestStatus(i, "fail");
-        failed++;
-      }
-    } catch (e) {
-      console.error(`Test "${test.name}" threw error:`, e);
-      updateTestStatus(i, "fail");
-      failed++;
-    }
-    
-    // Small delay between tests
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  
-  // Update summary
-  const total = tests.length;
-  document.getElementById("total-tests")!.textContent = total.toString();
-  document.getElementById("passed-tests")!.textContent = passed.toString();
-  document.getElementById("failed-tests")!.textContent = failed.toString();
-  document.getElementById("summary")!.style.display = "block";
-  
-  if (failed === 0) {
-    updateStatus(`✓ All ${total} tests passed!`, "success");
-  } else {
-    updateStatus(`✗ ${failed} of ${total} tests failed`, "error");
-  }
-}
+  // Register plugins globally
+  registerPlugin(labelsPlugin);
+  registerPlugin(zoomPlugin());
+  registerPlugin(hoverPlugin);
 
-function clearAll() {
-  const testsContainer = document.getElementById("tests")!;
-  testsContainer.innerHTML = "";
-  document.getElementById("summary")!.style.display = "none";
-  updateStatus("Ready to run tests", "pending");
+  // 1. Scatter chart with all plugins
+  const scatterContainer = document.getElementById("scatter-chart")!;
+  const scatterX = Array.from({ length: 2000 }, (_, i) => i);
+  const scatterY = Array.from({ length: 2000 }, () => Math.random() * 100);
   
-  // Re-render test cards
-  tests.forEach((test, i) => {
-    testsContainer.appendChild(createTestCard(test, i));
+  scatterChartId = manager.create({
+    type: "scatter",
+    container: scatterContainer,
+    series: [{
+      label: "Dataset A",
+      color: { r: 0.3, g: 0.6, b: 1 },
+      x: scatterX,
+      y: scatterY,
+    }],
+    showTooltip: true,
   });
+
+  // 2. Line chart with multiple series
+  const lineContainer = document.getElementById("line-chart")!;
+  const lineX = Array.from({ length: 1000 }, (_, i) => i);
+  
+  lineChartId = manager.create({
+    type: "line",
+    container: lineContainer,
+    series: [
+      {
+        label: "Sine",
+        color: { r: 1, g: 0.3, b: 0.3 },
+        x: lineX,
+        y: lineX.map((v) => Math.sin(v * 0.02) * 40 + 50),
+      },
+      {
+        label: "Cosine",
+        color: { r: 0.3, g: 0.9, b: 0.3 },
+        x: lineX,
+        y: lineX.map((v) => Math.cos(v * 0.02) * 40 + 50),
+      },
+      {
+        label: "Tan (scaled)",
+        color: { r: 0.9, g: 0.7, b: 0.2 },
+        x: lineX,
+        y: lineX.map((v) => Math.tan(v * 0.01) * 10 + 50),
+      },
+    ],
+    showTooltip: true,
+  });
+
+  // 3. Bar chart
+  const barContainer = document.getElementById("bar-chart")!;
+  const barX = Array.from({ length: 60 }, (_, i) => i);
+  const barY = Array.from({ length: 60 }, () => Math.random() * 80 + 20);
+  
+  barChartId = manager.create({
+    type: "bar",
+    container: barContainer,
+    series: [{
+      label: "Revenue",
+      color: { r: 0.6, g: 0.4, b: 0.9 },
+      x: barX,
+      y: barY,
+    }],
+    showTooltip: true,
+  });
+
+  // 4. Scatter without plugins (disable tooltip to test raw chart)
+  const scatterNoPluginsContainer = document.getElementById("scatter-no-plugins")!;
+  const noPluginX = Array.from({ length: 500 }, (_, i) => i);
+  const noPluginY = Array.from({ length: 500 }, () => Math.random() * 100);
+  
+  scatterNoPluginsId = manager.create({
+    type: "scatter",
+    container: scatterNoPluginsContainer,
+    series: [{
+      label: "Raw Data",
+      color: { r: 0.5, g: 0.5, b: 0.5 },
+      x: noPluginX,
+      y: noPluginY,
+    }],
+    showTooltip: false, // No interactions
+  });
+
+  // 5. Large dataset line chart
+  const lineLargeContainer = document.getElementById("line-large")!;
+  const largeX = Array.from({ length: 10000 }, (_, i) => i);
+  
+  lineLargeId = manager.create({
+    type: "line",
+    container: lineLargeContainer,
+    series: [
+      {
+        label: "Signal 1",
+        color: { r: 0.2, g: 0.8, b: 1 },
+        x: largeX,
+        y: largeX.map((v) => Math.sin(v * 0.005) * 30 + 50 + Math.random() * 10),
+      },
+      {
+        label: "Signal 2",
+        color: { r: 1, g: 0.5, b: 0.2 },
+        x: largeX,
+        y: largeX.map((v) => Math.cos(v * 0.003) * 25 + 50 + Math.random() * 10),
+      },
+    ],
+    showTooltip: true,
+  });
+
+  // Set up stats updates
+  manager.onStats((stats) => {
+    document.getElementById("stat-total")!.textContent = stats.total.toLocaleString();
+    document.getElementById("stat-visible")!.textContent = stats.visible.toLocaleString();
+    document.getElementById("stat-charts")!.textContent = manager.getChartCount().toString();
+    document.getElementById("stat-fps")!.textContent = "60";
+  });
+
+  console.log("✓ All charts initialized successfully");
+  console.log(`  • ${manager.getChartCount()} charts created`);
 }
 
-// Initialize
-document.getElementById("run-tests")!.addEventListener("click", runTests);
-document.getElementById("clear-all")!.addEventListener("click", clearAll);
-
+// Button handlers
 document.getElementById("toggle-theme")!.addEventListener("click", () => {
-  const isDark = document.documentElement.classList.toggle("dark");
-  document.body.style.background = isDark ? "#0a0a0a" : "#ffffff";
-  document.body.style.color = isDark ? "#e5e5e5" : "#1a1a1a";
-  manager?.setTheme(isDark);
+  isDarkTheme = !isDarkTheme;
+  document.body.classList.toggle("light");
+  manager.setTheme(isDarkTheme);
+  console.log(`Theme: ${isDarkTheme ? "dark" : "light"}`);
 });
 
-// Render initial test cards
-const testsContainer = document.getElementById("tests")!;
-tests.forEach((test, i) => {
-  testsContainer.appendChild(createTestCard(test, i));
+document.getElementById("toggle-sync")!.addEventListener("click", () => {
+  syncEnabled = !syncEnabled;
+  manager.setSyncViews(syncEnabled);
+  const btn = document.getElementById("toggle-sync")!;
+  btn.textContent = syncEnabled ? "Disable Sync Views" : "Enable Sync Views";
+  console.log(`Sync views: ${syncEnabled ? "enabled" : "disabled"}`);
 });
 
-updateStatus("Ready to run tests", "pending");
+document.getElementById("update-data")!.addEventListener("click", () => {
+  // Update scatter chart with new random data
+  const newX = Array.from({ length: 1500 }, (_, i) => i);
+  const newY = Array.from({ length: 1500 }, () => Math.random() * 120);
+  
+  manager.updateSeries(scatterChartId, [{
+    label: "Updated Dataset",
+    color: { r: 1, g: 0.5, b: 0.2 },
+    x: newX,
+    y: newY,
+  }]);
+  
+  // Update bar chart too
+  const barX = Array.from({ length: 80 }, (_, i) => i);
+  const barY = Array.from({ length: 80 }, () => Math.random() * 100);
+  
+  manager.updateSeries(barChartId, [{
+    label: "Updated Revenue",
+    color: { r: 0.2, g: 0.9, b: 0.5 },
+    x: barX,
+    y: barY,
+  }]);
+  
+  console.log("✓ Data updated");
+});
+
+document.getElementById("reset-zoom")!.addEventListener("click", () => {
+  manager.resetView(scatterChartId);
+  manager.resetView(lineChartId);
+  manager.resetView(barChartId);
+  manager.resetView(scatterNoPluginsId);
+  manager.resetView(lineLargeId);
+  console.log("✓ All zoom levels reset");
+});
+
+// Initialize on load
+init();

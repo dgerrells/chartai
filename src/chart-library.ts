@@ -235,48 +235,69 @@ export class ChartManager {
     if (this.worker) return true;
 
     return new Promise((resolve) => {
-      // Use import.meta.url for bundler compatibility (Vite, Webpack, etc.)
-      const workerUrl = new URL("./gpu-worker.js", import.meta.url);
-      this.worker = new Worker(workerUrl, { type: "module" });
-
-      this.worker.onmessage = (e) => {
-        const { type, ...data } = e.data;
-
-        switch (type) {
-          case "gpu-ready":
-            resolve(true);
-            break;
-          case "error":
-            console.error("ChartManager GPU Error:", data.message);
-            resolve(false);
-            break;
-          case "stats":
-            this.currentStats = {
-              fps: data.fps,
-              renderMs: data.renderMs,
-              total: data.totalCharts,
-              active: data.activeCharts,
-            };
-            for (const cb of this.statsCallbacks) cb(this.currentStats);
-            break;
-          case "bounds-update": {
-            const chart = this.charts.get(data.id);
-            if (chart) {
-              chart.bounds = {
-                minX: data.minX,
-                maxX: data.maxX,
-                minY: data.minY,
-                maxY: data.maxY,
-              };
-              this.drawChart(chart);
-            }
-            break;
-          }
-        }
-      };
-
-      this.worker.postMessage({ type: "init", isDark: this._isDark });
+      // Import inlined worker code for maximum compatibility
+      // This works with all bundlers without any special configuration
+      import("./worker-inline.js").then(({ WORKER_CODE }) => {
+        const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(blob);
+        this.worker = new Worker(workerUrl, { type: "module" });
+        this.setupWorkerHandlers(resolve);
+      }).catch(() => {
+        // Fallback to file-based worker if inline not available (shouldn't happen in production)
+        const workerUrl = new URL("./gpu-worker.js", import.meta.url);
+        this.worker = new Worker(workerUrl, { type: "module" });
+        this.setupWorkerHandlers(resolve);
+      });
     });
+  }
+
+  private setupWorkerHandlers(resolve: (value: boolean) => void): void {
+    if (!this.worker) return;
+
+    this.worker.onmessage = (e) => {
+      const { type, ...data } = e.data;
+
+      switch (type) {
+        case "gpu-ready":
+          resolve(true);
+          break;
+        case "error":
+          console.error("ChartManager GPU Error:", data.message);
+          resolve(false);
+          break;
+        case "stats":
+          this.currentStats = {
+            fps: data.fps,
+            renderMs: data.renderMs,
+            total: data.totalCharts,
+            active: data.activeCharts,
+          };
+          for (const cb of this.statsCallbacks) cb(this.currentStats);
+          break;
+        case "bounds-update": {
+          const chart = this.charts.get(data.id);
+          if (chart) {
+            chart.bounds = {
+              minX: data.minX,
+              maxX: data.maxX,
+              minY: data.minY,
+              maxY: data.maxY,
+            };
+            this.drawChart(chart);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    };
+
+    this.worker.onerror = (e) => {
+      console.error("ChartManager Worker Error:", e);
+      resolve(false);
+    };
+
+    this.worker.postMessage({ type: "init", isDark: this._isDark });
   }
 
   create(config: ChartConfig): string {
