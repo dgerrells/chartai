@@ -7,6 +7,6 @@
     "dev": "bun run server.ts"
   },
   "dependencies": {
-    "chartai": "beta"
+    "chartai": "0.0.2"
   }
 }

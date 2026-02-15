@@ -125,7 +125,7 @@ export function getPlugins(): readonly ChartPlugin[] {
 
 type StatsCallback = (stats: ChartStats) => void;
 
-class ChartManager {
+export class ChartManager {
   private static instance: ChartManager | null = null;
 
   static readonly MARGIN = { left: 55, right: 10, top: 8, bottom: 45 };
@@ -739,5 +739,3 @@ class ChartManager {
     }
   }
 }
-
-export { ChartManager };
