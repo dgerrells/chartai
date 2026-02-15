@@ -16,16 +16,16 @@
       "default": "./dist/gpu-worker.js"
     },
     "./plugins/hover": {
-      "types": "./dist/hover.d.ts",
-      "default": "./dist/hover.js"
+      "types": "./dist/plugins/hover.d.ts",
+      "default": "./dist/plugins/hover.js"
     },
     "./plugins/labels": {
-      "types": "./dist/labels.d.ts",
-      "default": "./dist/labels.js"
+      "types": "./dist/plugins/labels.d.ts",
+      "default": "./dist/plugins/labels.js"
     },
     "./plugins/zoom": {
-      "types": "./dist/zoom.d.ts",
-      "default": "./dist/zoom.js"
+      "types": "./dist/plugins/zoom.d.ts",
+      "default": "./dist/plugins/zoom.js"
     }
   },
   "files": [
@@ -62,7 +62,7 @@
   "license": "Unlicense",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dgerrells/chartai.git"
+    "url": "git+https://github.com/dgerrells/chartai.git"
   },
   "bugs": {
     "url": "https://github.com/dgerrells/chartai/issues"

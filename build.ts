@@ -29,19 +29,6 @@ async function generateTypes() {
     process.exit(1);
   }
   
-  // Move plugin .d.ts files from subdirectory to root
-  const pluginDir = path.join(DIST, "plugins");
-  if (fs.existsSync(pluginDir)) {
-    for (const f of fs.readdirSync(pluginDir)) {
-      if (f.endsWith(".d.ts") || f.endsWith(".d.ts.map")) {
-        const src = path.join(pluginDir, f);
-        const dest = path.join(DIST, f);
-        fs.renameSync(src, dest);
-      }
-    }
-    fs.rmSync(pluginDir, { recursive: true, force: true });
-  }
-  
   // Remove shaders .d.ts files (internal only, not part of public API)
   const shadersDir = path.join(DIST, "shaders");
   if (fs.existsSync(shadersDir)) {
@@ -119,7 +106,7 @@ async function buildLib() {
     path.join(SRC, "plugins/zoom.ts"),
   ];
 
-  // Readable build (splitting enables async shader chunks)
+  // Readable build (splitting enables code reuse and smaller bundles)
   const readable = await Bun.build({
     entrypoints: entries,
     outdir: DIST,
@@ -149,57 +136,24 @@ async function buildLib() {
     process.exit(1);
   }
 
-  // Move plugins from subdirectory to root
-  const pluginDir = path.join(DIST, "plugins");
-  if (fs.existsSync(pluginDir)) {
-    for (const f of fs.readdirSync(pluginDir)) {
-      const src = path.join(pluginDir, f);
-      const dest = path.join(DIST, f);
-      fs.renameSync(src, dest);
-    }
-    fs.rmSync(pluginDir, { recursive: true });
-  }
-
-  // Rename .js → .min.js and move to dist/
-  for (const name of [
-    "chart-library.js",
-    "gpu-worker.js",
-    "hover.js",
-    "labels.js",
-    "zoom.js",
-  ]) {
-    const minName = name.replace(".js", ".min.js");
-    const src = path.join(minDir, name);
-    if (fs.existsSync(src)) {
-      fs.renameSync(src, path.join(DIST, minName));
-    } else {
-      // Check if it's in a plugins subdirectory in minDir
-      const pluginSrc = path.join(
-        minDir,
-        "plugins",
-        name.split("/").pop() || name,
-      );
-      if (fs.existsSync(pluginSrc)) {
-        fs.renameSync(pluginSrc, path.join(DIST, minName));
+  // Rename minified files: .js → .min.js and copy to dist/
+  function copyMinified(dir: string, outDir: string) {
+    for (const item of fs.readdirSync(dir)) {
+      const srcPath = path.join(dir, item);
+      const stat = fs.statSync(srcPath);
+      
+      if (stat.isDirectory()) {
+        const newOutDir = path.join(outDir, item);
+        fs.mkdirSync(newOutDir, { recursive: true });
+        copyMinified(srcPath, newOutDir);
+      } else if (item.endsWith(".js")) {
+        const minName = item.replace(".js", ".min.js");
+        const destPath = path.join(outDir, minName);
+        fs.copyFileSync(srcPath, destPath);
       }
     }
   }
-  // Move any remaining files from minDir/plugins to dist/
-  const minPluginDir = path.join(minDir, "plugins");
-  if (fs.existsSync(minPluginDir)) {
-    for (const f of fs.readdirSync(minPluginDir)) {
-      const src = path.join(minPluginDir, f);
-      const dest = path.join(DIST, f.replace(".js", ".min.js"));
-      if (!fs.existsSync(dest)) fs.renameSync(src, dest);
-    }
-  }
-  for (const f of fs.readdirSync(minDir)) {
-    const src = path.join(minDir, f);
-    const dest = path.join(DIST, f);
-    if (fs.statSync(src).isFile() && !fs.existsSync(dest)) {
-      fs.renameSync(src, dest);
-    }
-  }
+  copyMinified(minDir, DIST);
   fs.rmSync(minDir, { recursive: true });
 
   const files = [
@@ -207,12 +161,12 @@ async function buildLib() {
     "chart-library.min.js",
     "gpu-worker.js",
     "gpu-worker.min.js",
-    "hover.js",
-    "hover.min.js",
-    "labels.js",
-    "labels.min.js",
-    "zoom.js",
-    "zoom.min.js",
+    "plugins/hover.js",
+    "plugins/hover.min.js",
+    "plugins/labels.js",
+    "plugins/labels.min.js",
+    "plugins/zoom.js",
+    "plugins/zoom.min.js",
   ]
     .map((f) => path.join(DIST, f))
     .filter((f) => fs.existsSync(f))

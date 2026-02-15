@@ -4,6 +4,7 @@ bun.lockb
 
 # Build output (library distribution)
 dist/
+.dist/
 
 # OS files
 .DS_Store

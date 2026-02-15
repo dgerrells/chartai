@@ -8,14 +8,14 @@ ChartAI is an ai powered chart library which can draw millions and millions of l
 
 Why ChartAI?
 
-* Tiny unlimited line chart at full lib is ~11kb plugins make it ~15kb
+* Tiny, unlimited charts at ~11kb, plugins make it ~15kb
 * Customizable with plugins
 * Lines, scatter, and bars
 * Chart synchronization
 * Stupid faster compute shaders
 * Passively rendered, automatic virtualization
 * Doesn't miss the spikes in data, unless you want it to
-* Simple af api
+* Simple api
 
 ### Add a line chart.
 
@@ -115,3 +115,7 @@ I need to draw lots of lines, points, boxes whatever on multiple (2o+) charts wh
 * Decimation may not be to your liking.
 
 * Finding the closes data point is a little messy.
+
+* I fucking hate npm publishing so if you like this, best bet is to just copypasta whatever you want. Or point local AI at this repo cook.
+
+* AI help with every line reviewed by a human. If you want your code free-range and hormone free, look elsewhere.
