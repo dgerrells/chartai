@@ -1736,9 +1736,12 @@ async function init() {
 
 // ─── Hot Reload ─────────────────────────────────────────────────────────────
 
-const ws = new WebSocket(`ws://${location.host}/__hot`);
-ws.onmessage = (e) => {
-  if (e.data === "reload") location.reload();
-};
+// Only enable hot reload in development
+if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+  const ws = new WebSocket(`ws://${location.host}/__hot`);
+  ws.onmessage = (e) => {
+    if (e.data === "reload") location.reload();
+  };
+}
 
 init();
