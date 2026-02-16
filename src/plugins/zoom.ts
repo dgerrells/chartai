@@ -6,7 +6,7 @@ export interface ZoomPluginOptions {
 }
 
 export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
-  const decay = opts.momentumDecay ?? 0.88;
+  const decay = opts.momentumDecay ?? 0.9;
 
   interface ZoomState {
     lastX: number;
@@ -27,10 +27,12 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
 
     install(chart, el) {
       // Configure touch behavior
+      // touch-action: none - touch starts inside chart = chart interaction, not page scroll
+      // To scroll the page, users touch outside the chart - simple and predictable
       const originalTouchAction = el.style.touchAction;
       const originalUserSelect = el.style.userSelect;
       const originalWebkitUserSelect = (el.style as any).webkitUserSelect;
-      el.style.touchAction = "pan-x pan-y";
+      el.style.touchAction = "none";
       el.style.userSelect = "none";
       (el.style as any).webkitUserSelect = "none";
 
@@ -49,42 +51,41 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
       };
       state.set(chart, s);
 
-      // Gesture recognition state (Hammer.js style)
       let pointers: PointerEvent[] = [];
-      type GestureState = 'none' | 'detecting' | 'pan' | 'pinch' | 'press';
-      let gestureState: GestureState = 'none';
-      
+      type GestureState = "none" | "detecting" | "pan" | "pinch" | "press";
+      let gestureState: GestureState = "none";
+
       // Gesture start position
       let startX = 0;
       let startY = 0;
       let lastX = 0;
       let lastY = 0;
       let lastTime = 0;
-      
+
       // Thresholds
       const PAN_THRESHOLD = 10; // px before pan starts
-      const TAP_THRESHOLD = 10; // px for tap detection  
+      const TAP_THRESHOLD = 10; // px for tap detection
       const PRESS_TIME = 500; // ms for press gesture
-      
+
       // Gesture timers
       let pressTimer: number | null = null;
-      
+
       // Pinch state
       let pinchStartDist = 0;
       let pinchStartZoomX = 1;
       let pinchStartZoomY = 1;
       let pinchCenterX = 0.5;
       let pinchCenterY = 0.5;
-      
+
       // Pan velocity
       let velX = 0;
       let velY = 0;
-      
+
       // Tap detection
       let lastTapTime = 0;
-      
+
       // Mouse edge scaling
-      let edgeScaleMode: 'x' | 'y' | null = null;
+      let edgeScaleMode: "x" | "y" | null = null;
       let edgeScaleStart = 0;
       let edgeScaleInitialZoom = 1;
 
@@ -137,7 +138,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
 
           if (pointers.length === 1) {
             // Single pointer - start detecting
-            gestureState = 'detecting';
+            gestureState = "detecting";
             startX = e.clientX;
             startY = e.clientY;
             lastX = e.clientX;
@@ -145,12 +146,12 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             velX = velY = 0;
             lastTime = performance.now();
             edgeScaleMode = null;
-            
+
             if (e.pointerType === "touch") {
               // Start press detection
               pressTimer = window.setTimeout(() => {
-                if (gestureState === 'detecting') {
-                  gestureState = 'press';
+                if (gestureState === "detecting") {
+                  gestureState = "press";
                   chart.dragging = false;
                 }
               }, PRESS_TIME);
@@ -183,14 +184,15 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               clearTimeout(pressTimer);
               pressTimer = null;
             }
-            
-            gestureState = 'pinch';
+
+            gestureState = "pinch";
             chart.dragging = false;
-            
+
+            // Prevent browser pinch-zoom
             if (e.pointerType === "touch") {
               e.preventDefault();
             }
-            
+
             const rect = el.getBoundingClientRect();
             const dx = pointers[1].clientX - pointers[0].clientX;
             const dy = pointers[1].clientY - pointers[0].clientY;
@@ -218,23 +220,26 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
           }
 
           if (pointers.length === 1) {
-            const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
-            
+            const totalDist = Math.hypot(
+              e.clientX - startX,
+              e.clientY - startY,
+            );
+
             // Gesture recognition: detecting -> pan
-            if (gestureState === 'detecting' && totalDist > PAN_THRESHOLD) {
-              gestureState = 'pan';
+            if (gestureState === "detecting" && totalDist > PAN_THRESHOLD) {
+              gestureState = "pan";
               chart.dragging = true;
               if (pressTimer) {
                 clearTimeout(pressTimer);
                 pressTimer = null;
               }
             }
-            
+
             // Handle press gesture (no movement)
-            if (gestureState === 'press') {
+            if (gestureState === "press") {
               return; // Don't pan in press mode
             }
-            
+
             // Handle edge scaling (mouse only)
             if (edgeScaleMode && e.pointerType !== "touch") {
               if (edgeScaleMode === "x") {
@@ -242,7 +247,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 const scale = Math.exp(pixelDelta / 200);
                 const newZoom = Math.max(
                   ChartManager.MIN_ZOOM,
-                  Math.min(ChartManager.MAX_ZOOM, edgeScaleInitialZoom * scale)
+                  Math.min(ChartManager.MAX_ZOOM, edgeScaleInitialZoom * scale),
                 );
                 const fx = chart.view.panX + 0.5 / edgeScaleInitialZoom;
                 chart.view.zoomX = newZoom;
@@ -254,7 +259,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 const scale = Math.exp(pixelDelta / 200);
                 const newZoom = Math.max(
                   ChartManager.MIN_ZOOM,
-                  Math.min(ChartManager.MAX_ZOOM, edgeScaleInitialZoom * scale)
+                  Math.min(ChartManager.MAX_ZOOM, edgeScaleInitialZoom * scale),
                 );
                 const fy = chart.view.panY + 0.5 / edgeScaleInitialZoom;
                 chart.view.zoomY = newZoom;
@@ -263,17 +268,13 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 return;
               }
             }
-            
+
             // Handle pan gesture
-            if (gestureState === 'pan' || (chart.dragging && !edgeScaleMode)) {
-              if (e.pointerType === "touch") {
-                e.preventDefault();
-              }
-              
+            if (gestureState === "pan" || (chart.dragging && !edgeScaleMode)) {
               const rect = el.getBoundingClientRect();
               const dx = (e.clientX - lastX) / rect.width;
               const dy = (e.clientY - lastY) / rect.height;
-              
+
               // Update velocity for momentum
               const now = performance.now();
               if (now - lastTime < 100) {
@@ -281,7 +282,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 velY = velY * 0.3 + dy * 0.7;
               }
               lastTime = now;
-              
+
               // Apply pan
               if (
                 chart.zoomMode !== "none" &&
@@ -295,21 +296,21 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               ) {
                 chart.view.panY += dy / chart.view.zoomY;
               }
-              
+
               lastX = e.clientX;
               lastY = e.clientY;
               sendView();
             }
-          } else if (pointers.length === 2 && gestureState === 'pinch') {
-            // Handle pinch gesture
+          } else if (pointers.length === 2 && gestureState === "pinch") {
+            // Handle pinch gesture - prevent browser zoom
             if (e.pointerType === "touch") {
               e.preventDefault();
             }
-            
+
             const dx = pointers[1].clientX - pointers[0].clientX;
             const dy = pointers[1].clientY - pointers[0].clientY;
             const dist = Math.hypot(dx, dy);
-            
+
             // Natural pinch: logarithmic scaling
             const pixelChange = dist - pinchStartDist;
             const scale = Math.exp(pixelChange / 300);
@@ -320,7 +321,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             ) {
               const newZoomX = Math.max(
                 ChartManager.MIN_ZOOM,
-                Math.min(ChartManager.MAX_ZOOM, pinchStartZoomX * scale)
+                Math.min(ChartManager.MAX_ZOOM, pinchStartZoomX * scale),
               );
               const fx = chart.view.panX + pinchCenterX / pinchStartZoomX;
               chart.view.zoomX = newZoomX;
@@ -333,7 +334,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             ) {
               const newZoomY = Math.max(
                 ChartManager.MIN_ZOOM,
-                Math.min(ChartManager.MAX_ZOOM, pinchStartZoomY * scale)
+                Math.min(ChartManager.MAX_ZOOM, pinchStartZoomY * scale),
               );
               const fy = chart.view.panY + pinchCenterY / pinchStartZoomY;
               chart.view.zoomY = newZoomY;
@@ -357,8 +358,8 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
 
         if (pointers.length === 0) {
           const totalDist = Math.hypot(e.clientX - startX, e.clientY - startY);
-          const isTap = totalDist < TAP_THRESHOLD && gestureState !== 'pan';
-          
+          const isTap = totalDist < TAP_THRESHOLD && gestureState !== "pan";
+
           // Handle tap gesture (single or double)
           if (isTap && e.pointerType === "touch") {
             const now = Date.now();
@@ -370,7 +371,7 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               lastTapTime = now;
             }
           }
-          
+
           // Handle mouse double-click
           if (isTap && e.pointerType !== "touch") {
             const now = Date.now();
@@ -381,19 +382,22 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               lastTapTime = now;
             }
           }
-          
+
           // Start momentum if was panning
-          if (gestureState === 'pan' && (Math.abs(velX) > 0.001 || Math.abs(velY) > 0.001)) {
+          if (
+            gestureState === "pan" &&
+            (Math.abs(velX) > 0.001 || Math.abs(velY) > 0.001)
+          ) {
             startMomentum();
           }
-          
+
           // Reset gesture state
-          gestureState = 'none';
+          gestureState = "none";
           chart.dragging = false;
           edgeScaleMode = null;
         } else if (pointers.length === 1) {
           // Went from 2 pointers back to 1
-          gestureState = 'detecting';
+          gestureState = "detecting";
           startX = pointers[0].clientX;
           startY = pointers[0].clientY;
           lastX = pointers[0].clientX;
