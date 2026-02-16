@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chartai</title>
+  <link rel="stylesheet" href="/demo/chart.css">
+  <script>
+    const stored = localStorage.getItem('theme');
+    const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">Chartai</h1>
+      </div>
+      <div class="header-stats">
+        <div class="stat">
+          <span class="stat-value" id="main-ms">--</span>
+          <span class="stat-label">Main</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value"><span id="active">0</span>/<span id="total">0</span></span>
+          <span class="stat-label">Active</span>
+        </div>
+      </div>
+      <button class="theme-btn" id="theme-btn" title="Toggle theme">
+        <svg id="theme-icon-sun" class="theme-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="theme-icon-moon" class="theme-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-group">
+        <label class="control-label">Type</label>
+        <select id="chart-type" class="select">
+          <option value="scatter">Scatter</option>
+          <option value="line">Line</option>
+          <option value="bar">Bar</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">Points</label>
+        <input type="number" id="point-count" class="input" value="10000" min="10" step="1000">
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">Series</label>
+        <input type="number" id="series-count" class="input" value="3" min="1" max="100" step="1">
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">Pattern</label>
+        <select id="pattern" class="select">
+          <option value="stock">Stock Market</option>
+          <option value="trending">Trending Up</option>
+          <option value="declining">Declining</option>
+          <option value="spikey">Spikey</option>
+          <option value="cyclic">Cyclic</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">&nbsp;</label>
+        <button class="btn btn-ghost" id="add-chart">Add Chart</button>
+      </div>
+      <div class="control-group">
+        <label class="control-label">&nbsp;</label>
+        <button class="btn btn-ghost" id="add-batch">+5 Charts</button>
+      </div>
+
+      <div class="control-spacer"></div>
+
+      <label class="toggle">
+        <input type="checkbox" id="sync-toggle">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label" id="sync-label">Sync Off</span>
+      </label>
+
+      <button class="btn btn-danger" id="clear-all">Clear All</button>
+    </div>
+
+    <!-- Chart Grid -->
+    <main class="chart-grid" id="chart-grid"></main>
+
+    <!-- Error Toast -->
+    <div class="toast hidden" id="error-toast"></div>
+  </div>
+
+  <script type="module" src="/demo/main.ts"></script>
+</invoke>
+</body>
+</html>

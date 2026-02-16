@@ -17,7 +17,7 @@ async function init() {
   // Initialize ChartManager
   manager = ChartManager.getInstance();
   const success = await manager.init();
-  
+
   if (!success) {
     console.error("Failed to initialize ChartManager");
     return;
@@ -32,23 +32,25 @@ async function init() {
   const scatterContainer = document.getElementById("scatter-chart")!;
   const scatterX = Array.from({ length: 2000 }, (_, i) => i);
   const scatterY = Array.from({ length: 2000 }, () => Math.random() * 100);
-  
+
   scatterChartId = manager.create({
     type: "scatter",
     container: scatterContainer,
-    series: [{
-      label: "Dataset A",
-      color: { r: 0.3, g: 0.6, b: 1 },
-      x: scatterX,
-      y: scatterY,
-    }],
+    series: [
+      {
+        label: "Dataset A",
+        color: { r: 0.3, g: 0.6, b: 1 },
+        x: scatterX,
+        y: scatterY,
+      },
+    ],
     showTooltip: true,
   });
 
   // 2. Line chart with multiple series
   const lineContainer = document.getElementById("line-chart")!;
   const lineX = Array.from({ length: 1000 }, (_, i) => i);
-  
+
   lineChartId = manager.create({
     type: "line",
     container: lineContainer,
@@ -79,40 +81,45 @@ async function init() {
   const barContainer = document.getElementById("bar-chart")!;
   const barX = Array.from({ length: 60 }, (_, i) => i);
   const barY = Array.from({ length: 60 }, () => Math.random() * 80 + 20);
-  
+
   barChartId = manager.create({
     type: "bar",
     container: barContainer,
-    series: [{
-      label: "Revenue",
-      color: { r: 0.6, g: 0.4, b: 0.9 },
-      x: barX,
-      y: barY,
-    }],
+    series: [
+      {
+        label: "Revenue",
+        color: { r: 0.6, g: 0.4, b: 0.9 },
+        x: barX,
+        y: barY,
+      },
+    ],
     showTooltip: true,
   });
 
   // 4. Scatter without plugins (disable tooltip to test raw chart)
-  const scatterNoPluginsContainer = document.getElementById("scatter-no-plugins")!;
+  const scatterNoPluginsContainer =
+    document.getElementById("scatter-no-plugins")!;
   const noPluginX = Array.from({ length: 500 }, (_, i) => i);
   const noPluginY = Array.from({ length: 500 }, () => Math.random() * 100);
-  
+
   scatterNoPluginsId = manager.create({
     type: "scatter",
     container: scatterNoPluginsContainer,
-    series: [{
-      label: "Raw Data",
-      color: { r: 0.5, g: 0.5, b: 0.5 },
-      x: noPluginX,
-      y: noPluginY,
-    }],
+    series: [
+      {
+        label: "Raw Data",
+        color: { r: 0.5, g: 0.5, b: 0.5 },
+        x: noPluginX,
+        y: noPluginY,
+      },
+    ],
     showTooltip: false, // No interactions
   });
 
   // 5. Large dataset line chart
   const lineLargeContainer = document.getElementById("line-large")!;
   const largeX = Array.from({ length: 10000 }, (_, i) => i);
-  
+
   lineLargeId = manager.create({
     type: "line",
     container: lineLargeContainer,
@@ -121,13 +128,17 @@ async function init() {
         label: "Signal 1",
         color: { r: 0.2, g: 0.8, b: 1 },
         x: largeX,
-        y: largeX.map((v) => Math.sin(v * 0.005) * 30 + 50 + Math.random() * 10),
+        y: largeX.map(
+          (v) => Math.sin(v * 0.005) * 30 + 50 + Math.random() * 10,
+        ),
       },
       {
         label: "Signal 2",
         color: { r: 1, g: 0.5, b: 0.2 },
         x: largeX,
-        y: largeX.map((v) => Math.cos(v * 0.003) * 25 + 50 + Math.random() * 10),
+        y: largeX.map(
+          (v) => Math.cos(v * 0.003) * 25 + 50 + Math.random() * 10,
+        ),
       },
     ],
     showTooltip: true,
@@ -135,9 +146,13 @@ async function init() {
 
   // Set up stats updates
   manager.onStats((stats) => {
-    document.getElementById("stat-total")!.textContent = stats.total.toLocaleString();
-    document.getElementById("stat-visible")!.textContent = stats.visible.toLocaleString();
-    document.getElementById("stat-charts")!.textContent = manager.getChartCount().toString();
+    document.getElementById("stat-total")!.textContent =
+      stats.total.toLocaleString();
+    document.getElementById("stat-visible")!.textContent =
+      stats.active.toLocaleString();
+    document.getElementById("stat-charts")!.textContent = manager
+      .getChartCount()
+      .toString();
     document.getElementById("stat-fps")!.textContent = "60";
   });
 
@@ -165,25 +180,29 @@ document.getElementById("update-data")!.addEventListener("click", () => {
   // Update scatter chart with new random data
   const newX = Array.from({ length: 1500 }, (_, i) => i);
   const newY = Array.from({ length: 1500 }, () => Math.random() * 120);
-  
-  manager.updateSeries(scatterChartId, [{
-    label: "Updated Dataset",
-    color: { r: 1, g: 0.5, b: 0.2 },
-    x: newX,
-    y: newY,
-  }]);
-  
+
+  manager.updateSeries(scatterChartId, [
+    {
+      label: "Updated Dataset",
+      color: { r: 1, g: 0.5, b: 0.2 },
+      x: newX,
+      y: newY,
+    },
+  ]);
+
   // Update bar chart too
   const barX = Array.from({ length: 80 }, (_, i) => i);
   const barY = Array.from({ length: 80 }, () => Math.random() * 100);
-  
-  manager.updateSeries(barChartId, [{
-    label: "Updated Revenue",
-    color: { r: 0.2, g: 0.9, b: 0.5 },
-    x: barX,
-    y: barY,
-  }]);
-  
+
+  manager.updateSeries(barChartId, [
+    {
+      label: "Updated Revenue",
+      color: { r: 0.2, g: 0.9, b: 0.5 },
+      x: barX,
+      y: barY,
+    },
+  ]);
+
   console.log("✓ Data updated");
 });
 

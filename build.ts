@@ -304,7 +304,7 @@ async function buildPages() {
   fs.rmSync(PAGES, { recursive: true, force: true });
   fs.mkdirSync(PAGES, { recursive: true });
 
-  // Bundle main.ts (pulls in chart-library)
+  // Bundle main.ts (landing page - pulls in chart-library)
   const main = await Bun.build({
     entrypoints: [path.join(ROOT, "pages", "main.ts")],
     outdir: PAGES,
@@ -343,7 +343,51 @@ async function buildPages() {
   html = html.replace('href="/chart.css"', 'href="./chart.css"');
   fs.writeFileSync(path.join(PAGES, "index.html"), html);
 
+  // Build demo subdirectory
+  const DEMO_OUT = path.join(PAGES, "demo");
+  fs.mkdirSync(DEMO_OUT, { recursive: true });
+
+  // Bundle demo/main.ts
+  const demoMain = await Bun.build({
+    entrypoints: [path.join(ROOT, "pages", "demo", "main.ts")],
+    outdir: DEMO_OUT,
+    format: "esm",
+    minify: true,
+    plugins: [shaderMinifierPlugin],
+  });
+  if (!demoMain.success) {
+    console.error("❌ demo main build failed:", demoMain.logs);
+    process.exit(1);
+  }
+
+  // Bundle worker for demo (splitting = async shader chunks)
+  const demoWorker = await Bun.build({
+    entrypoints: [path.join(SRC, "gpu-worker.ts")],
+    outdir: DEMO_OUT,
+    format: "esm",
+    minify: true,
+    splitting: true,
+    plugins: [shaderMinifierPlugin],
+  });
+  if (!demoWorker.success) {
+    console.error("❌ demo worker build failed:", demoWorker.logs);
+    process.exit(1);
+  }
+
+  // Copy CSS to demo
+  fs.copyFileSync(
+    path.join(ROOT, "pages", "chart.css"),
+    path.join(DEMO_OUT, "chart.css"),
+  );
+
+  // Copy demo/index.html with paths fixed
+  let demoHtml = fs.readFileSync(path.join(ROOT, "pages", "demo", "index.html"), "utf-8");
+  demoHtml = demoHtml.replace('src="/main.ts"', 'src="./main.js"');
+  demoHtml = demoHtml.replace('href="/chart.css"', 'href="./chart.css"');
+  fs.writeFileSync(path.join(DEMO_OUT, "index.html"), demoHtml);
+
   console.log("✅ docs/  (GitHub Pages ready)");
+  console.log("✅ docs/demo/  (Demo page ready)");
 }
 
 // ---------------------------------------------------------------------------

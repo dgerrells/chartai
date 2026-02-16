@@ -39,11 +39,24 @@ const server = Bun.serve({
       requestedPath = "/pages/index.html";
     }
     
+    // Handle /demo route
+    if (requestedPath === "/demo" || requestedPath === "/demo/") {
+      requestedPath = "/pages/demo/index.html";
+    }
+    
     // Redirect root files to pages directory
     if (requestedPath === "/main.ts") {
       requestedPath = "/pages/main.ts";
     }
     if (requestedPath === "/chart.css") {
+      requestedPath = "/pages/chart.css";
+    }
+    
+    // Redirect demo files
+    if (requestedPath === "/demo/main.ts") {
+      requestedPath = "/pages/demo/main.ts";
+    }
+    if (requestedPath === "/demo/chart.css") {
       requestedPath = "/pages/chart.css";
     }
 

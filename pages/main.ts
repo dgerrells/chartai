@@ -1,12 +1,7 @@
-// GPU Charts Demo - Consuming the ChartManager library
+// ChartAI Landing Page
 
 import { ChartManager, registerPlugin } from "../src/chart-library.ts";
-import type {
-  ChartType,
-  ChartConfig,
-  ChartSeries,
-  ZoomMode,
-} from "../src/chart-library.ts";
+import type { ChartSeries } from "../src/chart-library.ts";
 import { labelsPlugin } from "../src/plugins/labels.ts";
 import { zoomPlugin } from "../src/plugins/zoom.ts";
 import { hoverPlugin } from "../src/plugins/hover.ts";
@@ -17,250 +12,25 @@ registerPlugin(hoverPlugin);
 
 type DataPattern = "stock" | "trending" | "declining" | "spikey" | "cyclic";
 
-interface ChartInstance {
-  id: string;
-  type: ChartType;
-  pointCount: number;
-  zoomX: boolean;
-  zoomY: boolean;
-}
-
-const chartInstances: ChartInstance[] = [];
 let manager: ChartManager;
 let isDark = document.documentElement.classList.contains("dark");
 
-// --- Main-thread frame timing (outside the chart library) ---
-let _currentMainMs = 0;
-const _frameChannel = new MessageChannel();
-let _frameT0 = 0;
-let _lastDisplayUpdate = 0;
+// Live update state
+let liveUpdateSpeed = 1; // per second
+let liveUpdateInterval: number | null = null;
+let liveAccumulate = false; // accumulate vs ring buffer
+let liveLineId: string;
+let liveScatterId: string;
+let liveLine2Id: string;
+let liveDataX: number[] = [];
+let liveDataY1: number[] = [];
+let liveDataY2: number[] = [];
+let liveDataY3: number[] = [];
 
-_frameChannel.port1.onmessage = () => {
-  _currentMainMs = performance.now() - _frameT0;
-  const now = performance.now();
-
-  if (now - _lastDisplayUpdate >= 120) {
-    _lastDisplayUpdate = now;
-    const fmt = (ms: number) =>
-      ms < 1 ? ms.toFixed(2) + "ms" : ms.toFixed(1) + "ms";
-    document.getElementById("main-ms")!.textContent = fmt(_currentMainMs);
-  }
-};
-
-function _measureFrame() {
-  requestAnimationFrame(() => {
-    _frameT0 = performance.now();
-    // MessageChannel callback fires after all rAF callbacks + microtasks + paint
-    _frameChannel.port2.postMessage(null);
-    _measureFrame();
-  });
-}
-_measureFrame();
-
-// Base date for stock data - each data point is one day before
-const BASE_DATE = new Date("2026-02-03");
-
-function generateData(
-  count: number,
-  pattern: DataPattern,
-): { x: number[]; y: number[] } {
-  // Pre-allocate arrays — avoids push() overhead and repeated capacity growth
-  const x = new Array<number>(count);
-  const y = new Array<number>(count);
-
-  // Only stock uses date-based X axis (minutes ago)
-  const isDateAxis = pattern === "stock";
-
-  if (isDateAxis) {
-    for (let i = 0; i < count; i++) x[i] = count - 1 - i;
-  } else {
-    for (let i = 0; i < count; i++) x[i] = i;
-  }
-
-  const TWO_PI = 2 * Math.PI;
-
-  switch (pattern) {
-    case "stock": {
-      // Each data point = 1 minute. Doubles every 10 years.
-      // 10 years ≈ 3,652 days × 1,440 min/day = 5,258,880 minutes.
-      const MINS_PER_DECADE = 5258880;
-      const drift = Math.LN2 / MINS_PER_DECADE; // exact doubling per 10yr
-      const driftNeg = -drift * 3;
-      const vol = 0.0005; // per-minute volatility
-      const volHigh = vol * 1.8;
-
-      // Recessions: ~1 per decade of data, each lasting ~6-18 months of minutes
-      const decades = count / MINS_PER_DECADE;
-      const recessionCount = Math.max(
-        1,
-        Math.round(decades * (0.8 + Math.random() * 0.4)),
-      );
-      const rPairs: { s: number; e: number }[] = [];
-      for (let r = 0; r < recessionCount; r++) {
-        const start = Math.floor(Math.random() * count * 0.9);
-        const durationMins = Math.floor((180 + Math.random() * 360) * 1440); // 6-18 months in minutes
-        rPairs.push({ s: start, e: start + durationMins });
-      }
-      rPairs.sort((a, b) => a.s - b.s);
-
-      let logP = Math.log(10 + Math.random() * 20);
-      let rIdx = 0;
-      let spare = 0;
-      let hasSpare = false;
-      for (let i = 0; i < count; i++) {
-        while (rIdx < rPairs.length && i >= rPairs[rIdx].e) rIdx++;
-        const inRecession =
-          rIdx < rPairs.length && i >= rPairs[rIdx].s && i < rPairs[rIdx].e;
-
-        const d = inRecession ? driftNeg : drift;
-        const v = inRecession ? volHigh : vol;
-
-        // Box-Muller: use both variates to halve sqrt+log calls
-        let z: number;
-        if (hasSpare) {
-          z = spare;
-          hasSpare = false;
-        } else {
-          const u1 = Math.random() || 1e-10;
-          const r = Math.sqrt(-2 * Math.log(u1));
-          const theta = TWO_PI * Math.random();
-          z = r * Math.cos(theta);
-          spare = r * Math.sin(theta);
-          hasSpare = true;
-        }
-
-        logP += d + v * z;
-        y[i] = Math.exp(logP);
-      }
-      break;
-    }
-    case "trending": {
-      // Random walk on log-price with positive drift — looks like a real
-      // stock that's been going up. Per-step volatility is fixed so more
-      // points = more visible choppiness naturally.
-      let logP = Math.log(20 + Math.random() * 20);
-      // Target: price roughly doubles over the full series
-      const drift = Math.LN2 / count;
-      const vol = 0.015; // per-step volatility — constant regardless of count
-      let spare = 0;
-      let hasSpare = false;
-      for (let i = 0; i < count; i++) {
-        let z: number;
-        if (hasSpare) {
-          z = spare;
-          hasSpare = false;
-        } else {
-          const u1 = Math.random() || 1e-10;
-          const r = Math.sqrt(-2 * Math.log(u1));
-          const theta = TWO_PI * Math.random();
-          z = r * Math.cos(theta);
-          spare = r * Math.sin(theta);
-          hasSpare = true;
-        }
-        logP += drift + vol * z;
-        y[i] = Math.exp(logP);
-      }
-      break;
-    }
-    case "declining": {
-      // Random walk on log-price with negative drift — looks like a real
-      // stock that's been declining. Same per-step vol as trending.
-      let logP = Math.log(60 + Math.random() * 40);
-      // Target: price roughly halves over the full series
-      const drift = -Math.LN2 / count;
-      const vol = 0.015;
-      let spare = 0;
-      let hasSpare = false;
-      for (let i = 0; i < count; i++) {
-        let z: number;
-        if (hasSpare) {
-          z = spare;
-          hasSpare = false;
-        } else {
-          const u1 = Math.random() || 1e-10;
-          const r = Math.sqrt(-2 * Math.log(u1));
-          const theta = TWO_PI * Math.random();
-          z = r * Math.cos(theta);
-          spare = r * Math.sin(theta);
-          hasSpare = true;
-        }
-        logP += drift + vol * z;
-        y[i] = Math.exp(logP);
-      }
-      break;
-    }
-    case "spikey": {
-      // Random values in both directions with a few massive 5x spikes
-      const avg = 20 + Math.random() * 30;
-      const spikeCount = 3 + Math.floor(Math.random() * 5);
-      const spikeIndices = new Set<number>();
-      while (spikeIndices.size < Math.min(spikeCount, count)) {
-        spikeIndices.add(Math.floor(Math.random() * count));
-      }
-      const avg12 = avg * 1.2;
-      const avg5 = avg * 5;
-      for (let i = 0; i < count; i++) {
-        if (spikeIndices.has(i)) {
-          y[i] = Math.random() < 0.5 ? -avg5 : avg5;
-        } else {
-          y[i] = (Math.random() - 0.5) * avg12;
-        }
-      }
-      break;
-    }
-    case "cyclic": {
-      // Cyclic sinusoidal pattern, phase randomised by current time
-      const phase = ((Date.now() % 100000) / 100000) * TWO_PI;
-      const amplitude = 30 + Math.random() * 20;
-      const baseline = 50 + Math.random() * 20;
-      const cycles = 2 + Math.random() * 4;
-      const tScale = (TWO_PI * cycles) / count;
-      const harmAmp = amplitude * 0.25;
-      for (let i = 0; i < count; i++) {
-        const t = i * tScale + phase;
-        y[i] =
-          baseline +
-          Math.sin(t) * amplitude +
-          Math.sin(t * 2.7 + 1.3) * harmAmp +
-          (Math.random() - 0.5) * 8;
-      }
-      break;
-    }
-  }
-
-  return { x, y };
-}
-
-function formatPrice(value: number): string {
-  if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "k";
-  return "$" + value.toFixed(2);
-}
-
-// Format X axis as dates - value is minutes ago from BASE_DATE
-function formatDate(minutesAgo: number): string {
-  const ms = BASE_DATE.getTime() - Math.round(minutesAgo) * 60000;
-  const date = new Date(ms);
-
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const month = months[date.getMonth()];
-  const day = date.getDate();
-  const year = date.getFullYear();
-
-  return `${month} ${day}, ${year}`;
-}
+// Big data chart IDs
+let bigdataLineId: string | null = null;
+let bigdataScatterId: string | null = null;
+let bigseriesLineId: string | null = null;
 
 function hslToRgb(
   h: number,
@@ -303,13 +73,42 @@ function randomColor(): { r: number; g: number; b: number } {
   );
 }
 
-function formatCount(n: number): string {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(0) + "k";
-  return n.toString();
+// Base date for stock data - each data point is one day before
+const BASE_DATE = new Date("2026-02-03");
+
+function formatPrice(value: number): string {
+  if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "k";
+  if (value >= 100) return "$" + value.toFixed(0);
+  if (value >= 10) return "$" + value.toFixed(1);
+  return "$" + value.toFixed(2);
 }
 
-// Simple numeric formatters for non-stock data
+// Format X axis as dates - value is minutes ago from BASE_DATE
+function formatDate(minutesAgo: number): string {
+  const ms = BASE_DATE.getTime() - Math.round(minutesAgo) * 60000;
+  const date = new Date(ms);
+
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+
+  return `${month} ${day}, ${year}`;
+}
+
 function formatNumber(value: number): string {
   if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1) + "k";
   if (Math.abs(value) >= 100) return value.toFixed(0);
@@ -321,182 +120,587 @@ function formatIndex(value: number): string {
   return Math.round(value).toString();
 }
 
-function addChart(
-  type: ChartType,
-  pointCount: number,
+function generateData(
+  count: number,
   pattern: DataPattern,
-  seriesCount: number = 1,
-) {
-  seriesCount = Math.max(1, Math.min(10000, seriesCount));
+): { x: number[]; y: number[] } {
+  const x = new Array<number>(count);
+  const y = new Array<number>(count);
 
-  // Generate multiple series
-  const series: ChartSeries[] = [];
-  for (let i = 0; i < seriesCount; i++) {
-    const data = generateData(pointCount, pattern);
-    // Bar charts clamp Y >= 0 for stock-like patterns (bars grow up from baseline)
-    if (type === "bar" && pattern !== "spikey" && pattern !== "cyclic") {
-      for (let j = 0; j < data.y.length; j++) {
-        data.y[j] = Math.max(0, data.y[j]);
+  // Stock pattern uses date-based X axis (minutes ago)
+  const isDateAxis = pattern === "stock";
+  if (isDateAxis) {
+    for (let i = 0; i < count; i++) x[i] = count - 1 - i;
+  } else {
+    for (let i = 0; i < count; i++) x[i] = i;
+  }
+
+  const TWO_PI = 2 * Math.PI;
+
+  switch (pattern) {
+    case "stock": {
+      const MINS_PER_DECADE = 5258880;
+      const drift = Math.LN2 / MINS_PER_DECADE;
+      const driftNeg = -drift * 3;
+      const vol = 0.0005;
+      const volHigh = vol * 1.8;
+
+      const decades = count / MINS_PER_DECADE;
+      const recessionCount = Math.max(
+        1,
+        Math.round(decades * (0.8 + Math.random() * 0.4)),
+      );
+      const rPairs: { s: number; e: number }[] = [];
+      for (let r = 0; r < recessionCount; r++) {
+        const start = Math.floor(Math.random() * count * 0.9);
+        const durationMins = Math.floor((180 + Math.random() * 360) * 1440);
+        rPairs.push({ s: start, e: start + durationMins });
       }
-    }
+      rPairs.sort((a, b) => a.s - b.s);
 
-    series.push({
-      label: seriesCount > 1 ? `Series ${i + 1}` : "",
+      let logP = Math.log(10 + Math.random() * 20);
+      let rIdx = 0;
+      let spare = 0;
+      let hasSpare = false;
+      for (let i = 0; i < count; i++) {
+        while (rIdx < rPairs.length && i >= rPairs[rIdx].e) rIdx++;
+        const inRecession =
+          rIdx < rPairs.length && i >= rPairs[rIdx].s && i < rPairs[rIdx].e;
+
+        const d = inRecession ? driftNeg : drift;
+        const v = inRecession ? volHigh : vol;
+
+        let z: number;
+        if (hasSpare) {
+          z = spare;
+          hasSpare = false;
+        } else {
+          const u1 = Math.random() || 1e-10;
+          const r = Math.sqrt(-2 * Math.log(u1));
+          const theta = TWO_PI * Math.random();
+          z = r * Math.cos(theta);
+          spare = r * Math.sin(theta);
+          hasSpare = true;
+        }
+
+        logP += d + v * z;
+        y[i] = Math.exp(logP);
+      }
+      break;
+    }
+    case "trending": {
+      let logP = Math.log(20 + Math.random() * 20);
+      const drift = Math.LN2 / count;
+      const vol = 0.015;
+      let spare = 0;
+      let hasSpare = false;
+      for (let i = 0; i < count; i++) {
+        let z: number;
+        if (hasSpare) {
+          z = spare;
+          hasSpare = false;
+        } else {
+          const u1 = Math.random() || 1e-10;
+          const r = Math.sqrt(-2 * Math.log(u1));
+          const theta = TWO_PI * Math.random();
+          z = r * Math.cos(theta);
+          spare = r * Math.sin(theta);
+          hasSpare = true;
+        }
+        logP += drift + vol * z;
+        y[i] = Math.exp(logP);
+      }
+      break;
+    }
+    case "declining": {
+      let logP = Math.log(60 + Math.random() * 40);
+      const drift = -Math.LN2 / count;
+      const vol = 0.015;
+      let spare = 0;
+      let hasSpare = false;
+      for (let i = 0; i < count; i++) {
+        let z: number;
+        if (hasSpare) {
+          z = spare;
+          hasSpare = false;
+        } else {
+          const u1 = Math.random() || 1e-10;
+          const r = Math.sqrt(-2 * Math.log(u1));
+          const theta = TWO_PI * Math.random();
+          z = r * Math.cos(theta);
+          spare = r * Math.sin(theta);
+          hasSpare = true;
+        }
+        logP += drift + vol * z;
+        y[i] = Math.exp(logP);
+      }
+      break;
+    }
+    case "spikey": {
+      const avg = 20 + Math.random() * 30;
+      const spikeCount = 3 + Math.floor(Math.random() * 5);
+      const spikeIndices = new Set<number>();
+      while (spikeIndices.size < Math.min(spikeCount, count)) {
+        spikeIndices.add(Math.floor(Math.random() * count));
+      }
+      const avg12 = avg * 1.2;
+      const avg5 = avg * 5;
+      for (let i = 0; i < count; i++) {
+        if (spikeIndices.has(i)) {
+          y[i] = Math.random() < 0.5 ? -avg5 : avg5;
+        } else {
+          y[i] = (Math.random() - 0.5) * avg12;
+        }
+      }
+      break;
+    }
+    case "cyclic": {
+      const phase = ((Date.now() % 100000) / 100000) * TWO_PI;
+      const amplitude = 30 + Math.random() * 20;
+      const baseline = 50 + Math.random() * 20;
+      const cycles = 2 + Math.random() * 4;
+      const tScale = (TWO_PI * cycles) / count;
+      const harmAmp = amplitude * 0.25;
+      for (let i = 0; i < count; i++) {
+        const t = i * tScale + phase;
+        y[i] =
+          baseline +
+          Math.sin(t) * amplitude +
+          Math.sin(t * 2.7 + 1.3) * harmAmp +
+          (Math.random() - 0.5) * 8;
+      }
+      break;
+    }
+  }
+
+  return { x, y };
+}
+
+async function init() {
+  manager = ChartManager.getInstance();
+  const success = await manager.init();
+
+  if (!success) {
+    alert("WebGPU not available. Please use a supported browser.");
+    return;
+  }
+
+  setupTheme();
+  createBasicCharts();
+  createSeriesCharts();
+  createSpikesChart();
+  createLiveCharts();
+  setupBigDataControls();
+  setupBigSeriesControls();
+}
+
+function createBasicCharts() {
+  // Bar chart - 25 points with trending pattern
+  const barData = generateData(25, "trending");
+  manager.create({
+    type: "bar",
+    container: document.getElementById("basic-bar")!,
+    series: [
+      {
+        label: "Revenue",
+        color: { r: 0.6, g: 0.4, b: 0.9 },
+        x: barData.x,
+        y: barData.y,
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  // Line chart - 1000 points with trending pattern
+  const lineData = generateData(1000, "trending");
+  // Convert X to date-based format (minutes ago)
+  const lineDateX = lineData.x.map((_, i) => 1000 - 1 - i);
+  manager.create({
+    type: "line",
+    container: document.getElementById("basic-line")!,
+    series: [
+      {
+        label: "Stock Price",
+        color: { r: 0.3, g: 0.6, b: 1 },
+        x: lineDateX,
+        y: lineData.y,
+      },
+    ],
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  // Scatter chart - 5000 points with cyclic pattern
+  const scatterData = generateData(5000, "cyclic");
+  manager.create({
+    type: "scatter",
+    container: document.getElementById("basic-scatter")!,
+    series: [
+      {
+        label: "Cyclic Data",
+        color: { r: 1, g: 0.4, b: 0.4 },
+        x: scatterData.x,
+        y: scatterData.y,
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatNumber,
+    showTooltip: true,
+  });
+}
+
+function createSeriesCharts() {
+  // Bar chart - 25 points × 3 series (same pattern, varying heights)
+  const barSeries: ChartSeries[] = [];
+  const baseData = generateData(25, "trending");
+  const heightMultipliers = [1.0, 0.7, 1.3]; // Slight height variations
+  
+  for (let i = 0; i < 3; i++) {
+    const data = generateData(25, "trending");
+    const adjustedY = data.y.map(val => val * heightMultipliers[i]);
+    barSeries.push({
+      label: `Series ${i + 1}`,
+      color: randomColor(),
+      x: data.x,
+      y: adjustedY,
+    });
+  }
+  manager.create({
+    type: "bar",
+    container: document.getElementById("series-bar")!,
+    series: barSeries,
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  // Line chart - 1000 points × 3 series (trending patterns)
+  const lineSeries: ChartSeries[] = [];
+  for (let i = 0; i < 3; i++) {
+    const data = generateData(1000, "trending");
+    // Convert X to date-based format (minutes ago)
+    const lineDateX = data.x.map((_, idx) => 1000 - 1 - idx);
+    lineSeries.push({
+      label: `Series ${i + 1}`,
+      color: randomColor(),
+      x: lineDateX,
+      y: data.y,
+    });
+  }
+  manager.create({
+    type: "line",
+    container: document.getElementById("series-line")!,
+    series: lineSeries,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  // Scatter chart - 5000 points × 3 series (cyclic)
+  const scatterSeries: ChartSeries[] = [];
+  for (let i = 0; i < 3; i++) {
+    const data = generateData(5000, "cyclic");
+    scatterSeries.push({
+      label: `Series ${i + 1}`,
       color: randomColor(),
       x: data.x,
       y: data.y,
     });
   }
-
-  const isStock = pattern === "stock";
-
-  const instance: ChartInstance = {
-    id: "",
-    type,
-    pointCount,
-    zoomX: true,
-    zoomY: true,
-  };
-
-  const card = document.createElement("div");
-  card.className = "chart-card";
-
-  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-
-  const pointSizeHtml =
-    type === "scatter"
-      ? `
-      <div class="chart-point-size">
-        <input type="range" min="1" max="8" value="3" class="point-size-slider" title="Point size">
-        <span class="point-size-label">3px</span>
-      </div>`
-      : "";
-
-  const seriesCountLabel =
-    seriesCount > 1
-      ? `<span class="chart-card-series">×${seriesCount}</span>`
-      : "";
-
-  card.innerHTML = `
-    <div class="chart-card-header">
-      <span class="chart-card-title">Chart</span>
-      <span class="chart-card-type">${typeLabel}</span>
-      <span class="chart-card-points">${formatCount(pointCount)}</span>${seriesCountLabel}${pointSizeHtml}
-      <div class="chart-zoom-split">
-        <button class="zoom-axis-btn active" data-action="toggle-x" title="Toggle X zoom">X</button>
-        <button class="zoom-axis-btn active" data-action="toggle-y" title="Toggle Y zoom">Y</button>
-      </div>
-      <div class="chart-card-actions">
-        <button class="chart-action-btn" data-action="reset" title="Reset view">⌘</button>
-        <button class="chart-action-btn danger" data-action="remove" title="Remove">×</button>
-      </div>
-    </div>
-    <div class="chart-card-body"></div>
-  `;
-
-  document.getElementById("chart-grid")!.appendChild(card);
-  const container = card.querySelector(".chart-card-body") as HTMLElement;
-
-  const config: ChartConfig = {
-    type,
-    container,
-    series,
-    formatX: isStock ? formatDate : formatIndex,
-    formatY: isStock ? formatPrice : formatNumber,
-    zoomMode: "both",
+  manager.create({
+    type: "scatter",
+    container: document.getElementById("series-scatter")!,
+    series: scatterSeries,
+    formatX: formatIndex,
+    formatY: formatNumber,
     showTooltip: true,
-  };
+  });
+}
 
-  let chartId: string;
-  try {
-    chartId = manager.create(config);
-  } catch (e) {
-    console.error("Failed to create chart:", e);
-    card.remove();
-    return;
-  }
-  instance.id = chartId;
-  card.dataset.id = chartId;
-  container.id = `chart-container-${chartId}`;
+function createSpikesChart() {
+  const spikyData = generateData(100000, "spikey");
+  manager.create({
+    type: "line",
+    container: document.getElementById("spikes-line")!,
+    series: [
+      {
+        label: "Volatile Data",
+        color: { r: 1, g: 0.5, b: 0.2 },
+        x: spikyData.x,
+        y: spikyData.y,
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatNumber,
+    showTooltip: true,
+  });
+}
 
-  // Point size slider for scatter charts
-  const pointSizeSlider = card.querySelector(
-    ".point-size-slider",
-  ) as HTMLInputElement | null;
-  const pointSizeLabel = card.querySelector(
-    ".point-size-label",
-  ) as HTMLElement | null;
-  if (pointSizeSlider && pointSizeLabel) {
-    pointSizeSlider.addEventListener("input", () => {
-      const size = parseInt(pointSizeSlider.value);
-      pointSizeLabel.textContent = size + "px";
-      manager.setPointSize(instance.id, size);
-    });
-  }
+function createLiveCharts() {
+  // Initialize with 100 data points using trending pattern
+  const initialData1 = generateData(100, "trending");
+  const initialData2 = generateData(100, "trending");
+  const initialData3 = generateData(100, "trending");
+  
+  liveDataX = Array.from({ length: 100 }, (_, i) => i);
+  liveDataY1 = [...initialData1.y];
+  liveDataY2 = [...initialData2.y];
+  liveDataY3 = [...initialData3.y];
 
-  card.addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest(
-      "[data-action]",
-    ) as HTMLElement;
-    if (!btn) return;
-
-    const action = btn.dataset.action;
-    switch (action) {
-      case "reset":
-        manager.resetView(instance.id);
-        break;
-      case "remove":
-        removeChart(instance.id);
-        break;
-      case "toggle-x":
-        toggleAxis(instance, "x", btn, card);
-        break;
-      case "toggle-y":
-        toggleAxis(instance, "y", btn, card);
-        break;
-    }
+  liveLineId = manager.create({
+    type: "line",
+    container: document.getElementById("live-line")!,
+    series: [
+      {
+        label: "Live Data",
+        color: { r: 0.2, g: 0.8, b: 0.4 },
+        x: [...liveDataX],
+        y: [...liveDataY1],
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
   });
 
-  chartInstances.push(instance);
+  liveScatterId = manager.create({
+    type: "scatter",
+    container: document.getElementById("live-scatter")!,
+    series: [
+      {
+        label: "Live Data",
+        color: { r: 0.9, g: 0.3, b: 0.7 },
+        x: [...liveDataX],
+        y: [...liveDataY2],
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  liveLine2Id = manager.create({
+    type: "line",
+    container: document.getElementById("live-line2")!,
+    series: [
+      {
+        label: "Live Data",
+        color: { r: 0.4, g: 0.5, b: 1 },
+        x: [...liveDataX],
+        y: [...liveDataY3],
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  // Setup speed controls
+  const speedButtons = document.querySelectorAll(".speed-btn");
+  speedButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      speedButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      liveUpdateSpeed = parseInt((btn as HTMLElement).dataset.speed!);
+      startLiveUpdate();
+    });
+  });
+
+  // Setup accumulate toggle
+  const accumulateToggle = document.getElementById("accumulate-toggle") as HTMLInputElement;
+  accumulateToggle.addEventListener("change", () => {
+    liveAccumulate = accumulateToggle.checked;
+  });
+
+  // Start updates
+  startLiveUpdate();
 }
 
-function removeChart(id: string) {
-  manager.destroy(id);
-
-  const idx = chartInstances.findIndex((i) => i.id === id);
-  if (idx >= 0) {
-    chartInstances.splice(idx, 1);
+function startLiveUpdate() {
+  if (liveUpdateInterval !== null) {
+    clearInterval(liveUpdateInterval);
   }
 
-  const card = document.querySelector(`.chart-card[data-id="${id}"]`);
-  if (card) card.remove();
+  const intervalMs = 1000 / liveUpdateSpeed;
+  liveUpdateInterval = window.setInterval(() => {
+    const nextX = liveDataX.length > 0 ? liveDataX[liveDataX.length - 1] + 1 : 0;
+    const lastY1 = liveDataY1.length > 0 ? liveDataY1[liveDataY1.length - 1] : 50;
+    const lastY2 = liveDataY2.length > 0 ? liveDataY2[liveDataY2.length - 1] : 50;
+    const lastY3 = liveDataY3.length > 0 ? liveDataY3[liveDataY3.length - 1] : 50;
+    
+    // Generate new points with random walk
+    liveDataX.push(nextX);
+    liveDataY1.push(lastY1 + (Math.random() - 0.5) * 5);
+    liveDataY2.push(lastY2 + (Math.random() - 0.5) * 8);
+    liveDataY3.push(lastY3 + (Math.random() - 0.5) * 6);
+
+    // Ring buffer mode: keep last 500 points for performance
+    if (!liveAccumulate && liveDataX.length > 500) {
+      liveDataX.shift();
+      liveDataY1.shift();
+      liveDataY2.shift();
+      liveDataY3.shift();
+    }
+
+    // Update charts
+    manager.updateSeries(liveLineId, [
+      {
+        label: "Live Data",
+        color: { r: 0.2, g: 0.8, b: 0.4 },
+        x: [...liveDataX],
+        y: [...liveDataY1],
+      },
+    ]);
+
+    manager.updateSeries(liveScatterId, [
+      {
+        label: "Live Data",
+        color: { r: 0.9, g: 0.3, b: 0.7 },
+        x: [...liveDataX],
+        y: [...liveDataY2],
+      },
+    ]);
+
+    manager.updateSeries(liveLine2Id, [
+      {
+        label: "Live Data",
+        color: { r: 0.4, g: 0.5, b: 1 },
+        x: [...liveDataX],
+        y: [...liveDataY3],
+      },
+    ]);
+
+    // Update stats
+    const mode = liveAccumulate ? "Accumulate" : "Ring Buffer";
+    document.getElementById("live-stats")!.textContent = `Points: ${liveDataX.length} (${mode})`;
+  }, intervalMs);
 }
 
-function toggleAxis(
-  instance: ChartInstance,
-  axis: "x" | "y",
-  btn: HTMLElement,
-  card: Element,
-) {
-  if (axis === "x") {
-    instance.zoomX = !instance.zoomX;
-  } else {
-    instance.zoomY = !instance.zoomY;
-  }
+function setupBigDataControls() {
+  const generateBtn = document.getElementById("bigdata-generate")!;
+  const countInput = document.getElementById("bigdata-count") as HTMLInputElement;
+  const statsDiv = document.getElementById("bigdata-stats")!;
 
-  const xBtn = card.querySelector('[data-action="toggle-x"]') as HTMLElement;
-  const yBtn = card.querySelector('[data-action="toggle-y"]') as HTMLElement;
-  xBtn.classList.toggle("active", instance.zoomX);
-  yBtn.classList.toggle("active", instance.zoomY);
+  generateBtn.addEventListener("click", () => {
+    const count = parseInt(countInput.value) || 1000000;
+    generateBtn.setAttribute("disabled", "true");
+    statsDiv.textContent = "Generating...";
 
-  // Determine zoom mode - both can be off (disables zoom entirely)
-  let mode: ZoomMode;
-  if (instance.zoomX && instance.zoomY) mode = "both";
-  else if (instance.zoomX) mode = "x-only";
-  else if (instance.zoomY) mode = "y-only";
-  else mode = "none";
+    setTimeout(() => {
+      const t0 = performance.now();
 
-  manager.setZoomMode(instance.id, mode);
+      // Destroy old charts if they exist
+      if (bigdataLineId) manager.destroy(bigdataLineId);
+      if (bigdataScatterId) manager.destroy(bigdataScatterId);
+
+      // Generate data with stock pattern for line
+      const lineData = generateData(count, "stock");
+      // Generate cyclic pattern for scatter
+      const scatterData = generateData(count, "cyclic");
+
+      // Create line chart
+      bigdataLineId = manager.create({
+        type: "line",
+        container: document.getElementById("bigdata-line")!,
+        series: [
+          {
+            label: "Big Data",
+            color: { r: 0.3, g: 0.7, b: 0.9 },
+            x: lineData.x,
+            y: lineData.y,
+          },
+        ],
+        formatX: formatDate,
+        formatY: formatPrice,
+        showTooltip: true,
+      });
+
+      // Create scatter chart
+      bigdataScatterId = manager.create({
+        type: "scatter",
+        container: document.getElementById("bigdata-scatter")!,
+        series: [
+          {
+            label: "Big Data",
+            color: { r: 0.9, g: 0.5, b: 0.3 },
+            x: scatterData.x,
+            y: scatterData.y,
+          },
+        ],
+        formatX: formatIndex,
+        formatY: formatNumber,
+        showTooltip: true,
+      });
+
+      const elapsed = performance.now() - t0;
+      const countFormatted = (count / 1e6).toFixed(1) + "M";
+      
+      document.getElementById("bigdata-line-info")!.textContent = countFormatted;
+      document.getElementById("bigdata-scatter-info")!.textContent = countFormatted;
+      statsDiv.textContent = `Generated in ${elapsed.toFixed(0)}ms`;
+      generateBtn.removeAttribute("disabled");
+    }, 50);
+  });
+}
+
+function setupBigSeriesControls() {
+  const generateBtn = document.getElementById("bigseries-generate")!;
+  const seriesInput = document.getElementById("bigseries-series") as HTMLInputElement;
+  const pointsInput = document.getElementById("bigseries-points") as HTMLInputElement;
+  const statsDiv = document.getElementById("bigseries-stats")!;
+
+  generateBtn.addEventListener("click", () => {
+    const seriesCount = parseInt(seriesInput.value) || 1000;
+    const pointsPerSeries = parseInt(pointsInput.value) || 1000;
+    
+    generateBtn.setAttribute("disabled", "true");
+    statsDiv.textContent = "Generating...";
+
+    setTimeout(() => {
+      const t0 = performance.now();
+
+      // Destroy old chart if it exists
+      if (bigseriesLineId) manager.destroy(bigseriesLineId);
+
+      // Generate series with trending patterns
+      const series: ChartSeries[] = [];
+      for (let i = 0; i < seriesCount; i++) {
+        const data = generateData(pointsPerSeries, "trending");
+        // Convert X to date-based format (minutes ago)
+        const lineDateX = data.x.map((_, idx) => pointsPerSeries - 1 - idx);
+        series.push({
+          label: `S${i + 1}`,
+          color: randomColor(),
+          x: lineDateX,
+          y: data.y,
+        });
+      }
+
+      // Create chart
+      bigseriesLineId = manager.create({
+        type: "line",
+        container: document.getElementById("bigseries-line")!,
+        series,
+        formatX: formatDate,
+        formatY: formatPrice,
+        showTooltip: true,
+      });
+
+      const elapsed = performance.now() - t0;
+      const totalPoints = seriesCount * pointsPerSeries;
+      const formatted = totalPoints >= 1e6 
+        ? (totalPoints / 1e6).toFixed(1) + "M" 
+        : (totalPoints / 1e3).toFixed(0) + "k";
+      
+      document.getElementById("bigseries-info")!.textContent = 
+        `${seriesCount} series × ${pointsPerSeries} pts = ${formatted} total`;
+      statsDiv.textContent = `Generated in ${elapsed.toFixed(0)}ms`;
+      generateBtn.removeAttribute("disabled");
+    }, 50);
+  });
 }
 
 function setupTheme() {
@@ -519,90 +723,5 @@ function setupTheme() {
     updateIcon();
   });
 }
-
-async function init() {
-  manager = ChartManager.getInstance();
-
-  const success = await manager.init();
-  if (!success) {
-    const toast = document.getElementById("error-toast")!;
-    toast.textContent = "WebGPU not available. Please use a supported browser.";
-    toast.classList.remove("hidden");
-    return;
-  }
-
-  manager.onStats((stats) => {
-    document.getElementById("active")!.textContent = stats.active.toString();
-    document.getElementById("total")!.textContent = stats.total.toString();
-  });
-
-  setupTheme();
-  setupControls();
-
-  setTimeout(() => {
-    addChart("scatter", 500, "stock", 1);
-    addChart("line", 300, "trending", 3);
-    addChart("bar", 100, "spikey", 1);
-    addChart("line", 200, "cyclic", 1);
-  }, 100);
-}
-
-function setupControls() {
-  const typeSelect = document.getElementById("chart-type") as HTMLSelectElement;
-  const pointsInput = document.getElementById(
-    "point-count",
-  ) as HTMLInputElement;
-  const patternSelect = document.getElementById("pattern") as HTMLSelectElement;
-  const syncToggle = document.getElementById("sync-toggle") as HTMLInputElement;
-  const syncLabel = document.getElementById("sync-label")!;
-  const seriesInput = document.getElementById(
-    "series-count",
-  ) as HTMLInputElement;
-
-  document.getElementById("add-chart")!.addEventListener("click", () => {
-    const type = typeSelect.value as ChartType;
-    const points = parseInt(pointsInput.value) || 500;
-    const pattern = patternSelect.value as DataPattern;
-    const seriesCount = Math.max(
-      1,
-      Math.min(10000, parseInt(seriesInput.value) || 3),
-    );
-    addChart(type, points, pattern, seriesCount);
-  });
-
-  document.getElementById("add-batch")!.addEventListener("click", () => {
-    const type = typeSelect.value as ChartType;
-    const points = parseInt(pointsInput.value) || 500;
-    const pattern = patternSelect.value as DataPattern;
-    const seriesCount = Math.max(
-      1,
-      Math.min(10000, parseInt(seriesInput.value) || 3),
-    );
-
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        addChart(type, points, pattern, seriesCount);
-      }, i * 100);
-    }
-  });
-
-  document.getElementById("clear-all")!.addEventListener("click", () => {
-    for (const instance of [...chartInstances]) {
-      removeChart(instance.id);
-    }
-  });
-
-  syncToggle.addEventListener("change", () => {
-    const synced = syncToggle.checked;
-    manager.setSyncViews(synced);
-    syncLabel.textContent = synced ? "Synced" : "Sync Off";
-  });
-}
-
-// Hot reload support
-const ws = new WebSocket(`ws://${location.host}/__hot`);
-ws.onmessage = (e) => {
-  if (e.data === "reload") location.reload();
-};
 
 init();

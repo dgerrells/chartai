@@ -4,7 +4,9 @@ Are you looking for a simple tiny little chart library which can draw as many li
 
 ChartAI is an ai powered chart library which can draw millions and millions of lines across hundreds at 60fps. But like good engineers we only draw when we need to saving battery life. 
 
-**[Try the Canvas Demo →](https://dgerrells.github.io/chartai/canvas/)**
+**[Examples →](https://dgerrells.github.io/chartai/)**
+**[Playground →](https://dgerrells.github.io/chartai/demo/)**
+**[Real data canvas demo →](https://dgerrells.github.io/chartai/canvas/)**
 
 Why ChartAI?
 
@@ -103,19 +105,11 @@ I need to draw lots of lines, points, boxes whatever on multiple (2o+) charts wh
 ## Gotchas and missing features
 
 * appending or updating is stupid. Full reupload. There are ways you can fast copy on the gpu memory to smartly grow. At small sizes it is still butter.
-
 * Bar charts...i like these and will not change them. They may not fit your jib. Copypasta your own shader, this lib is tiny. 
-
 * Webgpu is used. No compute shaders, no charts
-
 * missing line size option. I need to switch up to a post process option (works well and cheap) or use signed distance fields. Many benefits but complex.
-
 * triple layered canvas. The plugins allow for canvas drawing behind and in front of the chart via 2 extra canvases. I hate it. There is a way I think to use a single canvas but I am still trying to figure it out.
-
 * Decimation may not be to your liking.
-
 * Finding the closes data point is a little messy.
-
 * I fucking hate npm publishing so if you like this, best bet is to just copypasta whatever you want. Or point local AI at this repo cook.
-
-* AI help with every line reviewed by a human. If you want your code free-range and hormone free, look elsewhere.
+* AI help with human review. If you want your code free-range and hormone free, look elsewhere. This works for me. 
