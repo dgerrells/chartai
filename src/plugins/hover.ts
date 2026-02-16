@@ -75,24 +75,34 @@ export const hoverPlugin: ChartPlugin = {
       }
     };
 
+    const handleHover = (clientX: number, clientY: number) => {
+      if (chart.dragging) return;
+      const r = el.getBoundingClientRect();
+      update(
+        chart.findNearestPoint(
+          clientX - r.left,
+          clientY - r.top,
+          r.width,
+          r.height,
+        ),
+      );
+    };
+
+    el.addEventListener("mousemove", (e) => handleHover(e.clientX, e.clientY), {
+      signal: ac.signal,
+    });
+
     el.addEventListener(
-      "mousemove",
+      "touchmove",
       (e) => {
-        if (chart.dragging) return;
-        const r = el.getBoundingClientRect();
-        update(
-          chart.findNearestPoint(
-            e.clientX - r.left,
-            e.clientY - r.top,
-            r.width,
-            r.height,
-          ),
-        );
+        if (e.touches.length === 1) {
+          handleHover(e.touches[0].clientX, e.touches[0].clientY);
+        }
       },
-      { signal: ac.signal },
+      { signal: ac.signal, passive: true },
     );
 
-    ["mouseleave", "pointerdown"].forEach((ev) =>
+    ["mouseleave", "pointerdown", "touchend", "touchcancel"].forEach((ev) =>
       el.addEventListener(ev, () => update(null), { signal: ac.signal }),
     );
   },

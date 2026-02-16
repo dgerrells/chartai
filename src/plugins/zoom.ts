@@ -14,6 +14,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
     velX: number;
     velY: number;
     abort: AbortController;
+    originalTouchAction: string;
+    originalUserSelect: string;
+    originalWebkitUserSelect: string;
+    el: HTMLElement;
   }
 
   const state = new WeakMap<InternalChart, ZoomState>();
@@ -22,6 +26,16 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
     name: "zoom",
 
     install(chart, el) {
+      // Set touch-action to allow scrolling but prevent browser pinch-zoom
+      // This lets the chart handle pinch gestures while allowing page scroll
+      const originalTouchAction = el.style.touchAction;
+      const originalUserSelect = el.style.userSelect;
+      const originalWebkitUserSelect = (el.style as any).webkitUserSelect;
+      el.style.touchAction = "pan-x pan-y";
+      // Prevent text selection/highlighting
+      el.style.userSelect = "none";
+      (el.style as any).webkitUserSelect = "none";
+      
       const mgr = ChartManager.getInstance();
       const ac = new AbortController();
       const s: ZoomState = {
@@ -30,6 +44,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
         velX: 0,
         velY: 0,
         abort: ac,
+        originalTouchAction,
+        originalUserSelect,
+        originalWebkitUserSelect,
+        el,
       };
       state.set(chart, s);
 
@@ -40,6 +58,9 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
         pinchZoomY = 1,
         pinchX = 0.5,
         pinchY = 0.5;
+      let longPressTimer: number | null = null;
+      let isInspectMode = false;
+      const LONG_PRESS_DURATION = 500; // ms
 
       const sendView = () => {
         mgr.sendViewTransform(chart);
@@ -77,10 +98,11 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
         chart.momentum = requestAnimationFrame(tick);
       };
 
-      const cancelDrag = () => {
-        if (chart.dragging) {
+      const cancelDrag = (e: PointerEvent) => {
+        // Only cancel if no captured pointers remain (important for mobile)
+        // Touch events might trigger leave but should continue if captured
+        if (chart.dragging && pointers.length === 0) {
           chart.dragging = false;
-          pointers = [];
         }
       };
 
@@ -101,7 +123,27 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             s.lastY = e.clientY;
             s.velX = s.velY = 0;
             lastTime = performance.now();
+            isInspectMode = false;
+            
+            // Start long-press timer for touch inputs
+            if (e.pointerType === "touch") {
+              longPressTimer = window.setTimeout(() => {
+                isInspectMode = true;
+                chart.dragging = false; // Disable dragging in inspect mode
+              }, LONG_PRESS_DURATION);
+            }
           } else if (pointers.length === 2) {
+            // Cancel long-press and inspect mode when second finger touches
+            if (longPressTimer) {
+              clearTimeout(longPressTimer);
+              longPressTimer = null;
+            }
+            isInspectMode = false;
+            
+            // Prevent page zoom when pinching
+            if (e.pointerType === "touch") {
+              e.preventDefault();
+            }
             const rect = el.getBoundingClientRect();
             const dx = pointers[1].clientX - pointers[0].clientX;
             const dy = pointers[1].clientY - pointers[0].clientY;
@@ -117,19 +159,42 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 rect.height;
           }
         },
-        { signal: ac.signal },
+        { passive: false, signal: ac.signal },
       );
 
       el.addEventListener(
         "pointermove",
         (e) => {
           const idx = pointers.findIndex((p) => p.pointerId === e.pointerId);
-          if (idx >= 0) pointers[idx] = e;
+          if (idx >= 0) {
+            pointers[idx] = e;
+          }
 
           if (pointers.length === 1 && chart.dragging) {
             const rect = el.getBoundingClientRect();
             const dx = (e.clientX - s.lastX) / rect.width;
             const dy = (e.clientY - s.lastY) / rect.height;
+            const movementThreshold = 0.005; // Small movement to cancel long-press
+            
+            // Cancel long-press timer if user moves before it triggers
+            if (longPressTimer && (Math.abs(dx) > movementThreshold || Math.abs(dy) > movementThreshold)) {
+              clearTimeout(longPressTimer);
+              longPressTimer = null;
+            }
+            
+            // Skip panning if in inspect mode (long-press activated)
+            if (isInspectMode) {
+              // Don't pan, but update last position for potential mode exit
+              s.lastX = e.clientX;
+              s.lastY = e.clientY;
+              return;
+            }
+            
+            // With touch-action: pan-x pan-y, we can safely preventDefault during chart interaction
+            // The browser will handle scroll vs pan disambiguation at the gesture start
+            if (e.pointerType === "touch") {
+              e.preventDefault();
+            }
 
             const now = performance.now();
             if (now - lastTime < 100) {
@@ -154,6 +219,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             s.lastY = e.clientY;
             sendView();
           } else if (pointers.length === 2) {
+            // Always prevent default during pinch
+            if (e.pointerType === "touch") {
+              e.preventDefault();
+            }
             const dx = pointers[1].clientX - pointers[0].clientX;
             const dy = pointers[1].clientY - pointers[0].clientY;
             const d = Math.hypot(dx, dy);
@@ -188,17 +257,26 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             sendView();
           }
         },
-        { signal: ac.signal },
+        { passive: false, signal: ac.signal },
       );
 
       const endPointer = (e: PointerEvent) => {
         pointers = pointers.filter((p) => p.pointerId !== e.pointerId);
         el.releasePointerCapture(e.pointerId);
 
-        if (pointers.length === 0 && chart.dragging) {
-          chart.dragging = false;
-          if (Math.abs(s.velX) > 0.001 || Math.abs(s.velY) > 0.001) {
-            startMomentum();
+        // Clean up long-press timer and inspect mode
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+
+        if (pointers.length === 0) {
+          isInspectMode = false;
+          if (chart.dragging) {
+            chart.dragging = false;
+            if (!isInspectMode && (Math.abs(s.velX) > 0.001 || Math.abs(s.velY) > 0.001)) {
+              startMomentum();
+            }
           }
         }
       };
@@ -211,14 +289,30 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
         signal: ac.signal,
       });
 
-      // Double-tap to reset view
+      // Double-tap to reset view (single pointer only)
       let lastTap = 0;
       el.addEventListener(
         "pointerup",
-        () => {
-          const now = Date.now();
-          if (now - lastTap < 300) mgr.resetView(chart.id);
-          lastTap = now;
+        (e) => {
+          // Only trigger on single-pointer tap (not after pinch/multi-touch)
+          if (pointers.length === 1 && e.pointerType === "touch") {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+              mgr.resetView(chart.id);
+              lastTap = 0; // Reset to prevent triple-tap
+            } else {
+              lastTap = now;
+            }
+          } else if (e.pointerType !== "touch") {
+            // Allow double-click on mouse
+            const now = Date.now();
+            if (now - lastTap < 300) {
+              mgr.resetView(chart.id);
+              lastTap = 0;
+            } else {
+              lastTap = now;
+            }
+          }
         },
         { signal: ac.signal },
       );
@@ -290,6 +384,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
           cancelAnimationFrame(chart.momentum);
           chart.momentum = null;
         }
+        // Restore original styles
+        s.el.style.touchAction = s.originalTouchAction;
+        s.el.style.userSelect = s.originalUserSelect;
+        (s.el.style as any).webkitUserSelect = s.originalWebkitUserSelect;
         s.abort.abort();
         state.delete(chart);
       }
