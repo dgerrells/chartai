@@ -1,6 +1,6 @@
 {
   "name": "chartai",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "tiny gpu powered charts",
   "type": "module",
   "main": "./dist/chart-library.js",
