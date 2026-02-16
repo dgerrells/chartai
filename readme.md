@@ -4,9 +4,9 @@ Are you looking for a simple tiny little chart library which can draw as many li
 
 ChartAI is an ai powered chart library which can draw millions and millions of lines across hundreds at 60fps. But like good engineers we only draw when we need to saving battery life. 
 
-**[Examples →](https://dgerrells.github.io/chartai/)**
-**[Playground →](https://dgerrells.github.io/chartai/demo/)**
-**[Real data canvas demo →](https://dgerrells.github.io/chartai/canvas/)**
+* **[Examples](https://dgerrells.github.io/chartai/)**
+* **[Playground](https://dgerrells.github.io/chartai/demo/)**
+* **[Real data canvas demo](https://dgerrells.github.io/chartai/canvas/)**
 
 Why ChartAI?
 
