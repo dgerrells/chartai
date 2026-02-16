@@ -1476,7 +1476,14 @@ async function loadPresetIntoChart(chart: CanvasChart, preset: DataPreset) {
     const result = fn(data, preset.url);
     if (!result || !Array.isArray(result.x) || !Array.isArray(result.y)) return;
     if (result.x.length === 0) return;
-    manager.updateData(chart.chartId, { x: result.x, y: result.y });
+    manager.updateSeries(chart.chartId, [
+      {
+        label: preset.name,
+        color: randomColor(),
+        x: result.x,
+        y: result.y,
+      },
+    ]);
     manager.resetView(chart.chartId);
     updateTilePoints(chart, result.x.length);
     chart.name = preset.name;
@@ -1543,7 +1550,14 @@ async function loadDataSource() {
     }
 
     // Update chart data
-    manager.updateData(chart.chartId, { x: result.x, y: result.y });
+    manager.updateSeries(chart.chartId, [
+      {
+        label: chart.name,
+        color: randomColor(),
+        x: result.x,
+        y: result.y,
+      },
+    ]);
     manager.resetView(chart.chartId);
 
     // Update point count badge
