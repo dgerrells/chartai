@@ -341,20 +341,35 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
         signal: ac.signal,
       });
 
-      // Double-tap to reset view (single pointer only)
+      // Double-tap to reset view (check before pointer removal)
       let lastTap = 0;
+      let lastTapWasSinglePointer = false;
       el.addEventListener(
         "pointerup",
         (e) => {
-          if (pointers.length === 1 && e.pointerType === "touch") {
-            const now = Date.now();
-            if (now - lastTap < 300) {
-              mgr.resetView(chart.id);
-              lastTap = 0; // Reset to prevent triple-tap
+          // Check if this is a single-pointer release (before endPointer removes it)
+          const isSinglePointerRelease = pointers.length === 1;
+          
+          if (isSinglePointerRelease && e.pointerType === "touch") {
+            // Only count as tap if not in edge scale mode and didn't move (cancel long press)
+            const isQuickTap = !edgeScaleMode && !longPressCancelled;
+            
+            if (isQuickTap) {
+              const now = Date.now();
+              if (now - lastTap < 300 && lastTapWasSinglePointer) {
+                mgr.resetView(chart.id);
+                lastTap = 0; // Reset to prevent triple-tap
+                lastTapWasSinglePointer = false;
+              } else {
+                lastTap = now;
+                lastTapWasSinglePointer = true;
+              }
             } else {
-              lastTap = now;
+              // Was a pan/scale, reset tap timing
+              lastTapWasSinglePointer = false;
             }
           } else if (e.pointerType !== "touch") {
+            // Mouse double-click
             const now = Date.now();
             if (now - lastTap < 300) {
               mgr.resetView(chart.id);
@@ -362,6 +377,9 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
             } else {
               lastTap = now;
             }
+          } else {
+            // Multi-touch release, reset single pointer flag
+            lastTapWasSinglePointer = false;
           }
         },
         { signal: ac.signal },
