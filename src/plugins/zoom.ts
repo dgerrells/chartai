@@ -321,9 +321,8 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) /
                 rect.height;
 
-            // Natural pinch: logarithmic scaling
             const pixelChange = dist - pinchStartDist;
-            const scale = Math.exp(pixelChange / 300);
+            const scale = Math.exp(pixelChange / 280); // Reduced from 300 for snappier feel
 
             if (
               chart.zoomMode !== "none" &&
@@ -334,7 +333,8 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 Math.min(ChartManager.MAX_ZOOM, pinchStartZoomX * scale),
               );
               // Zoom towards current pinch center, not initial
-              const fx = chart.view.panX + currentPinchCenterX / chart.view.zoomX;
+              const fx =
+                chart.view.panX + currentPinchCenterX / chart.view.zoomX;
               chart.view.zoomX = newZoomX;
               chart.view.panX = fx - currentPinchCenterX / newZoomX;
             }
@@ -348,7 +348,8 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 Math.min(ChartManager.MAX_ZOOM, pinchStartZoomY * scale),
               );
               // Zoom towards current pinch center, not initial
-              const fy = chart.view.panY + currentPinchCenterY / chart.view.zoomY;
+              const fy =
+                chart.view.panY + currentPinchCenterY / chart.view.zoomY;
               chart.view.zoomY = newZoomY;
               chart.view.panY = fy - currentPinchCenterY / newZoomY;
             }
