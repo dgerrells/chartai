@@ -307,9 +307,19 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
               e.preventDefault();
             }
 
+            const rect = el.getBoundingClientRect();
             const dx = pointers[1].clientX - pointers[0].clientX;
             const dy = pointers[1].clientY - pointers[0].clientY;
             const dist = Math.hypot(dx, dy);
+
+            // Recalculate pinch center on every move - zoom towards current finger position
+            const currentPinchCenterX =
+              ((pointers[0].clientX + pointers[1].clientX) / 2 - rect.left) /
+              rect.width;
+            const currentPinchCenterY =
+              1 -
+              ((pointers[0].clientY + pointers[1].clientY) / 2 - rect.top) /
+                rect.height;
 
             // Natural pinch: logarithmic scaling
             const pixelChange = dist - pinchStartDist;
@@ -323,9 +333,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 ChartManager.MIN_ZOOM,
                 Math.min(ChartManager.MAX_ZOOM, pinchStartZoomX * scale),
               );
-              const fx = chart.view.panX + pinchCenterX / pinchStartZoomX;
+              // Zoom towards current pinch center, not initial
+              const fx = chart.view.panX + currentPinchCenterX / chart.view.zoomX;
               chart.view.zoomX = newZoomX;
-              chart.view.panX = fx - pinchCenterX / newZoomX;
+              chart.view.panX = fx - currentPinchCenterX / newZoomX;
             }
 
             if (
@@ -336,9 +347,10 @@ export function zoomPlugin(opts: ZoomPluginOptions = {}): ChartPlugin {
                 ChartManager.MIN_ZOOM,
                 Math.min(ChartManager.MAX_ZOOM, pinchStartZoomY * scale),
               );
-              const fy = chart.view.panY + pinchCenterY / pinchStartZoomY;
+              // Zoom towards current pinch center, not initial
+              const fy = chart.view.panY + currentPinchCenterY / chart.view.zoomY;
               chart.view.zoomY = newZoomY;
-              chart.view.panY = fy - pinchCenterY / newZoomY;
+              chart.view.panY = fy - currentPinchCenterY / newZoomY;
             }
 
             sendView();
