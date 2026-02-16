@@ -339,8 +339,8 @@ async function buildPages() {
 
   // Copy index.html with paths fixed for compiled output
   let html = fs.readFileSync(path.join(ROOT, "pages", "index.html"), "utf-8");
-  html = html.replace('src="/main.ts"', 'src="./main.js"');
-  html = html.replace('href="/chart.css"', 'href="./chart.css"');
+  html = html.replace('src="main.ts"', 'src="./main.js"');
+  html = html.replace('href="chart.css"', 'href="./chart.css"');
   fs.writeFileSync(path.join(PAGES, "index.html"), html);
 
   // Build demo subdirectory
@@ -382,8 +382,8 @@ async function buildPages() {
 
   // Copy demo/index.html with paths fixed
   let demoHtml = fs.readFileSync(path.join(ROOT, "pages", "demo", "index.html"), "utf-8");
-  demoHtml = demoHtml.replace('src="/main.ts"', 'src="./main.js"');
-  demoHtml = demoHtml.replace('href="/chart.css"', 'href="./chart.css"');
+  demoHtml = demoHtml.replace('src="main.ts"', 'src="./main.js"');
+  demoHtml = demoHtml.replace('href="chart.css"', 'href="./chart.css"');
   fs.writeFileSync(path.join(DEMO_OUT, "index.html"), demoHtml);
 
   console.log("✅ docs/  (GitHub Pages ready)");
