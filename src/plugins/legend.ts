@@ -7,9 +7,7 @@ export interface LegendConfig {
   fontFamily?: string;
   labelSize?: number;
   textColor?: string;
-  /** Start with legend open. Default: false. */
   defaultOpen?: boolean;
-  /** Legend always open, no toggle or close. Default: false. */
   alwaysOpen?: boolean;
 }
 
@@ -57,10 +55,19 @@ function getLegendStyles(chart: InternalChart<ChartConfig & LegendConfig>) {
     panelBorder: border,
     closeBg,
     closeBgSolid: dark ? "rgba(0.2,0.2,0.22,0.98)" : "rgba(255,255,255,0.98)",
-    text: getLegendConfig(chart).textColor ?? chart.config.textColor ?? (dark ? "#c0c0c0" : "#333333"),
+    text:
+      getLegendConfig(chart).textColor ??
+      chart.config.textColor ??
+      (dark ? "#c0c0c0" : "#333333"),
     textMuted: dark ? "#888" : "#999",
-    font: getLegendConfig(chart).fontFamily ?? chart.config.fontFamily ?? DEFAULT_FONT,
-    labelSize: getLegendConfig(chart).labelSize ?? chart.config.labelSize ?? DEFAULT_LABEL_SIZE,
+    font:
+      getLegendConfig(chart).fontFamily ??
+      chart.config.fontFamily ??
+      DEFAULT_FONT,
+    labelSize:
+      getLegendConfig(chart).labelSize ??
+      chart.config.labelSize ??
+      DEFAULT_LABEL_SIZE,
   };
 }
 
@@ -232,7 +239,8 @@ function computePanelWidth(
   const styles = getLegendStyles(chart);
   const font = styles.font;
   const fontSize = styles.labelSize;
-  const maxChars = getLegendConfig(chart).maxLabelChars ?? DEFAULT_MAX_LABEL_CHARS;
+  const maxChars =
+    getLegendConfig(chart).maxLabelChars ?? DEFAULT_MAX_LABEL_CHARS;
 
   let maxW = 0;
   for (const label of labels) {
@@ -256,7 +264,8 @@ function syncSeries(chart: InternalChart<ChartConfig & LegendConfig>) {
   if (key === s.lastSeriesKey) return;
   s.lastSeriesKey = key;
 
-  const maxChars = getLegendConfig(chart).maxLabelChars ?? DEFAULT_MAX_LABEL_CHARS;
+  const maxChars =
+    getLegendConfig(chart).maxLabelChars ?? DEFAULT_MAX_LABEL_CHARS;
   const labels = series.map((ser, i) => ser.label || `Series ${i + 1}`);
   s.computedWidth = computePanelWidth(chart, labels);
 
@@ -311,7 +320,11 @@ function applyOpenState(chart: InternalChart<ChartConfig & LegendConfig>) {
   s.panel.style.display = open ? "flex" : "none";
   s.closeBtn.style.opacity = alwaysOpen ? "0" : open ? "0" : "0";
   s.closeBtn.style.pointerEvents = alwaysOpen ? "none" : open ? "auto" : "none";
-  s.closeBtn.style.visibility = alwaysOpen ? "hidden" : open ? "visible" : "hidden";
+  s.closeBtn.style.visibility = alwaysOpen
+    ? "hidden"
+    : open
+      ? "visible"
+      : "hidden";
 
   // Hide scroll overflow during height animation to prevent scrollbar flash
   s.scrollArea.style.overflowY = "hidden";
