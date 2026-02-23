@@ -154,16 +154,24 @@ async function buildLib() {
 
   const entries = [
     path.join(SRC, "chart-library.ts"),
+    path.join(SRC, "types.ts"),
     path.join(SRC, "gpu-worker.ts"),
     path.join(SRC, "plugins/hover.ts"),
     path.join(SRC, "plugins/labels.ts"),
+    path.join(SRC, "plugins/labels-panel.ts"),
+    path.join(SRC, "plugins/legend.ts"),
     path.join(SRC, "plugins/zoom.ts"),
+    path.join(SRC, "charts/line.ts"),
+    path.join(SRC, "charts/area.ts"),
+    path.join(SRC, "charts/scatter.ts"),
+    path.join(SRC, "charts/bar.ts"),
   ];
 
   // Readable build (splitting enables code reuse and smaller bundles)
   const readable = await Bun.build({
     entrypoints: entries,
     outdir: DIST,
+    root: SRC,
     format: "esm",
     minify: false,
     splitting: true,
@@ -183,6 +191,7 @@ async function buildLib() {
   const minified = await Bun.build({
     entrypoints: entries,
     outdir: minDir,
+    root: SRC,
     format: "esm",
     minify: true,
     splitting: true,
@@ -279,8 +288,16 @@ async function buildLib() {
     "plugins/hover.min.js",
     "plugins/labels.js",
     "plugins/labels.min.js",
+    "plugins/labels-panel.js",
+    "plugins/labels-panel.min.js",
+    "plugins/legend.js",
+    "plugins/legend.min.js",
     "plugins/zoom.js",
     "plugins/zoom.min.js",
+    "charts/line.js",
+    "charts/area.js",
+    "charts/scatter.js",
+    "charts/bar.js",
   ]
     .map((f) => path.join(DIST, f))
     .filter((f) => fs.existsSync(f))

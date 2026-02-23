@@ -1,9 +1,86 @@
-import type {
-  ChartPlugin,
-  InternalChart,
-  HoverData,
-} from "../chart-library.ts";
+import type { ChartPlugin, InternalChart, HoverData } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
+import { DEFAULT_FONT } from "./labels.ts";
+import { MARGIN } from "./shared.ts";
+
+const MAX_HOVER_PX = 50;
+
+function findNearestPoint(
+  chart: InternalChart,
+  screenX: number,
+  screenY: number,
+  width: number,
+  height: number,
+): HoverData | null {
+  if (chart.series.length === 0) return null;
+  const rX = chart.bounds.maxX - chart.bounds.minX;
+  const rY = chart.bounds.maxY - chart.bounds.minY;
+  const vW = rX / chart.view.zoomX;
+  const vH = rY / chart.view.zoomY;
+  const vMinX = chart.bounds.minX + chart.view.panX * rX;
+  const vMinY = chart.bounds.minY + chart.view.panY * rY;
+  const dataX = vMinX + (screenX / width) * vW;
+  const dataY = vMinY + (1 - screenY / height) * vH;
+
+  let bsi = -1,
+    bi = -1,
+    bdx = Infinity,
+    bdy = Infinity;
+  for (let s = 0; s < chart.series.length; s++) {
+    const sr = chart.series[s];
+    const n = sr.rawX.length;
+    if (n === 0) continue;
+    let lo = 0,
+      hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sr.rawX[mid] < dataX) lo = mid + 1;
+      else hi = mid;
+    }
+    let idx = lo;
+    if (
+      lo > 0 &&
+      Math.abs(sr.rawX[lo - 1] - dataX) < Math.abs(sr.rawX[lo] - dataX)
+    )
+      idx = lo - 1;
+    const dx = Math.abs(sr.rawX[idx] - dataX);
+    const dy = Math.abs(sr.rawY[idx] - dataY);
+    if (dx < bdx || (dx === bdx && dy < bdy)) {
+      bdx = dx;
+      bdy = dy;
+      bsi = s;
+      bi = idx;
+    }
+  }
+  if (bsi === -1) return null;
+  const sr = chart.series[bsi];
+  if (Math.abs(((sr.rawX[bi] - vMinX) / vW) * width - screenX) > MAX_HOVER_PX)
+    return null;
+  return {
+    x: sr.rawX[bi],
+    y: sr.rawY[bi],
+    index: bi,
+    screenX,
+    screenY,
+    seriesIndex: bsi,
+    seriesLabel: sr.label,
+  };
+}
+
+export interface HoverConfig {
+  onHover?: (data: HoverData | null) => void;
+  showTooltip?: boolean;
+  pillDecayMs?: number;
+  fontFamily?: string;
+  formatX?: (value: number) => string;
+  formatY?: (value: number) => string;
+}
+
+declare module "../types.ts" {
+  interface ChartPluginRegistry {
+    hover: HoverConfig;
+  }
+}
 
 interface HoverState {
   hoverResult: HoverData | null;
@@ -36,11 +113,11 @@ const drawBox = (
   ctx.stroke();
 };
 
-export const hoverPlugin: ChartPlugin = {
+export const hoverPlugin: ChartPlugin<HoverConfig> = {
   name: "hover",
 
   install(chart, el) {
-    const mgr = ChartManager.getInstance();
+    const mgr = ChartManager;
     const ac = new AbortController();
     const s: HoverState = {
       hoverResult: null,
@@ -79,7 +156,8 @@ export const hoverPlugin: ChartPlugin = {
       if (chart.dragging) return;
       const r = el.getBoundingClientRect();
       update(
-        chart.findNearestPoint(
+        findNearestPoint(
+          chart,
           clientX - r.left,
           clientY - r.top,
           r.width,
@@ -114,12 +192,12 @@ export const hoverPlugin: ChartPlugin = {
     const { hoverResult: hvr } = s;
     const w = chart.width;
     const h = chart.height;
-    const margin = ChartManager.MARGIN;
-    const dark = ChartManager.getInstance().isDark;
+    const margin = MARGIN;
+    const dark = ChartManager.isDark;
     const {
       formatX = String,
       formatY = String,
-      fontFamily = ChartManager.DEFAULT_FONT,
+      fontFamily = DEFAULT_FONT,
     } = chart.config;
 
     const rx = (chart.bounds.maxX - chart.bounds.minX) / chart.view.zoomX;
@@ -158,8 +236,14 @@ export const hoverPlugin: ChartPlugin = {
     ctx.strokeStyle = dark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.9)";
     ctx.stroke();
 
+    type SeriesPoint = {
+      label: string;
+      val: string;
+      rawVal: number;
+      col: string;
+    };
     const seriesData = chart.series
-      .map((ser) => {
+      .map((ser): SeriesPoint | null => {
         let l = 0,
           r = ser.rawX.length - 1;
         while (l <= r) {
@@ -175,9 +259,8 @@ export const hoverPlugin: ChartPlugin = {
         }
         return null;
       })
-      .filter(Boolean) as any[];
+      .filter((x): x is SeriesPoint => x !== null);
 
-    // Sort by value (highest first) and truncate to top 5
     seriesData.sort((a, b) => Math.abs(b.rawVal) - Math.abs(a.rawVal));
     const totalSeries = seriesData.length;
     const displayData = seriesData.slice(0, 5);
@@ -231,7 +314,7 @@ export const hoverPlugin: ChartPlugin = {
       true,
     );
     drawPill(
-      Math.max(margin.left, margin.left),
+      margin.left,
       Math.max(9, Math.min(h - margin.bottom - 9, s.pillY)),
       formatY(hvr.y),
       false,
@@ -272,7 +355,6 @@ export const hoverPlugin: ChartPlugin = {
       ctx.fillText(`${sd.label}: ${sd.val}`, bx + 24, ty);
     });
 
-    // Show "+N more" if there are remaining series
     if (remainingCount > 0) {
       const ty = by + 35 + displayData.length * 18;
       ctx.fillStyle = dark ? "#666" : "#aaa";

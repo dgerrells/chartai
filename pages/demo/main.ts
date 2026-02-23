@@ -1,24 +1,23 @@
 // GPU Charts Demo - Consuming the ChartManager library
 
-import { ChartManager, registerPlugin } from "../../src/chart-library.ts";
-import type {
-  ChartType,
-  ChartConfig,
-  ChartSeries,
-  ZoomMode,
-} from "../../src/chart-library.ts";
+import { ChartManager as manager } from "../../src/chart-library.ts";
+import type { Chart } from "../../src/chart-library.ts";
+import type { ChartConfig, ChartSeries, ZoomMode } from "../../src/types.ts";
 import { labelsPlugin } from "../../src/plugins/labels.ts";
 import { zoomPlugin } from "../../src/plugins/zoom.ts";
 import { hoverPlugin } from "../../src/plugins/hover.ts";
+import { legendPlugin } from "../../src/plugins/legend.ts";
+import { LineChart } from "../../src/charts/line.ts";
+import { AreaChart } from "../../src/charts/area.ts";
+import { ScatterChart } from "../../src/charts/scatter.ts";
+import { BarChart } from "../../src/charts/bar.ts";
 
-registerPlugin(labelsPlugin);
-registerPlugin(zoomPlugin());
-registerPlugin(hoverPlugin);
+type ChartType = "line" | "area" | "scatter" | "bar";
 
 type DataPattern = "stock" | "trending" | "declining" | "spikey" | "cyclic";
 
 interface ChartInstance {
-  id: string;
+  chart: Chart<any>;
   type: ChartType;
   pointCount: number;
   zoomX: boolean;
@@ -26,7 +25,7 @@ interface ChartInstance {
 }
 
 const chartInstances: ChartInstance[] = [];
-let manager: ChartManager;
+// manager is the imported singleton
 let isDark = document.documentElement.classList.contains("dark");
 
 // --- Main-thread frame timing (outside the chart library) ---
@@ -350,8 +349,9 @@ function addChart(
 
   const isStock = pattern === "stock";
 
+  let chart: Chart;
   const instance: ChartInstance = {
-    id: "",
+    chart: null!,
     type,
     pointCount,
     zoomX: true,
@@ -397,7 +397,7 @@ function addChart(
   document.getElementById("chart-grid")!.appendChild(card);
   const container = card.querySelector(".chart-card-body") as HTMLElement;
 
-  const config: ChartConfig = {
+  const config: ChartConfig & Record<string, unknown> = {
     type,
     container,
     series,
@@ -407,17 +407,16 @@ function addChart(
     showTooltip: true,
   };
 
-  let chartId: string;
   try {
-    chartId = manager.create(config);
+    chart = manager.create(config);
   } catch (e) {
     console.error("Failed to create chart:", e);
     card.remove();
     return;
   }
-  instance.id = chartId;
-  card.dataset.id = chartId;
-  container.id = `chart-container-${chartId}`;
+  instance.chart = chart;
+  card.dataset.id = chart.id;
+  container.id = `chart-container-${chart.id}`;
 
   // Point size slider for scatter charts
   const pointSizeSlider = card.querySelector(
@@ -430,7 +429,7 @@ function addChart(
     pointSizeSlider.addEventListener("input", () => {
       const size = parseInt(pointSizeSlider.value);
       pointSizeLabel.textContent = size + "px";
-      manager.setPointSize(instance.id, size);
+      instance.chart.configure({ pointSize: size });
     });
   }
 
@@ -442,34 +441,22 @@ function addChart(
 
     const action = btn.dataset.action;
     switch (action) {
-      case "reset":
-        manager.resetView(instance.id);
-        break;
-      case "remove":
-        removeChart(instance.id);
-        break;
-      case "toggle-x":
-        toggleAxis(instance, "x", btn, card);
-        break;
-      case "toggle-y":
-        toggleAxis(instance, "y", btn, card);
-        break;
+      case "reset":  instance.chart.resetView(); break;
+      case "remove": removeChart(instance); break;
+      case "toggle-x": toggleAxis(instance, "x", btn, card); break;
+      case "toggle-y": toggleAxis(instance, "y", btn, card); break;
     }
   });
 
   chartInstances.push(instance);
 }
 
-function removeChart(id: string) {
-  manager.destroy(id);
-
-  const idx = chartInstances.findIndex((i) => i.id === id);
-  if (idx >= 0) {
-    chartInstances.splice(idx, 1);
-  }
-
-  const card = document.querySelector(`.chart-card[data-id="${id}"]`);
-  if (card) card.remove();
+function removeChart(instance: ChartInstance) {
+  const id = instance.chart.id;
+  instance.chart.destroy();
+  const idx = chartInstances.indexOf(instance);
+  if (idx >= 0) chartInstances.splice(idx, 1);
+  document.querySelector(`.chart-card[data-id="${id}"]`)?.remove();
 }
 
 function toggleAxis(
@@ -496,7 +483,7 @@ function toggleAxis(
   else if (instance.zoomY) mode = "y-only";
   else mode = "none";
 
-  manager.setZoomMode(instance.id, mode);
+  instance.chart.configure({ zoomMode: mode });
 }
 
 function setupTheme() {
@@ -521,7 +508,15 @@ function setupTheme() {
 }
 
 async function init() {
-  manager = ChartManager.getInstance();
+
+  manager.use(LineChart);
+  manager.use(AreaChart);
+  manager.use(ScatterChart);
+  manager.use(BarChart);
+  manager.use(labelsPlugin);
+  manager.use(zoomPlugin());
+  manager.use(hoverPlugin);
+  manager.use(legendPlugin);
 
   const success = await manager.init();
   if (!success) {
@@ -587,9 +582,7 @@ function setupControls() {
   });
 
   document.getElementById("clear-all")!.addEventListener("click", () => {
-    for (const instance of [...chartInstances]) {
-      removeChart(instance.id);
-    }
+    for (const instance of [...chartInstances]) removeChart(instance);
   });
 
   syncToggle.addEventListener("change", () => {

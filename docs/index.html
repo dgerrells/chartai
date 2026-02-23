@@ -78,6 +78,18 @@
       background: var(--accent-hover);
     }
 
+    .landing-section-heading {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 40px 0 20px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .landing-section-heading:first-of-type {
+      margin-top: 0;
+    }
+
     .section {
       margin-bottom: 32px;
       padding: 24px;
@@ -278,6 +290,19 @@
       color: var(--text-secondary);
     }
 
+    .chart-row-compact {
+      min-height: 200px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .chart-row-compact .chart-wrapper {
+      min-height: 200px;
+    }
+
+    .chart-row-compact .chart-body {
+      min-height: 160px;
+    }
+
     @media (max-width: 768px) {
       .chart-row {
         grid-template-columns: 1fr;
@@ -313,10 +338,12 @@
       </div>
     </div>
 
-    <!-- Basic -->
+    <h2 class="landing-section-heading">Charts</h2>
+
+    <!-- Base -->
     <div class="section">
-      <h2 class="section-title">Basic Charts</h2>
-      <p class="section-description">Three fundamental chart types with different data sizes</p>
+      <h2 class="section-title">Base</h2>
+      <p class="section-description">All chart types in simple form</p>
       <div class="chart-row" id="basic-charts">
         <div class="chart-wrapper">
           <div class="chart-header">
@@ -338,6 +365,13 @@
             <span class="chart-info">5,000 points</span>
           </div>
           <div class="chart-body" id="basic-scatter"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header">
+            <span class="chart-label">Area Chart</span>
+            <span class="chart-info">1,000 points</span>
+          </div>
+          <div class="chart-body" id="basic-area"></div>
         </div>
       </div>
     </div>
@@ -367,6 +401,13 @@
             <span class="chart-info">5,000 points × 3 series</span>
           </div>
           <div class="chart-body" id="series-scatter"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header">
+            <span class="chart-label">Area Chart</span>
+            <span class="chart-info">1,000 points × 3 series</span>
+          </div>
+          <div class="chart-body" id="series-area"></div>
         </div>
       </div>
     </div>
@@ -491,6 +532,92 @@
             <span class="chart-info" id="bigseries-info">Not generated</span>
           </div>
           <div class="chart-body" id="bigseries-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="landing-section-heading">Plugins</h2>
+
+    <!-- Legend -->
+    <div class="section">
+      <h2 class="section-title">Legend</h2>
+      <p class="section-description">defaultOpen, alwaysOpen, maxLabelChars</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Default</span><span class="chart-info">legend: {}</span></div>
+          <div class="chart-body" id="legend-default"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">defaultOpen</span><span class="chart-info">Starts open</span></div>
+          <div class="chart-body" id="legend-default-open"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">alwaysOpen</span><span class="chart-info">No close</span></div>
+          <div class="chart-body" id="legend-always-open"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">12 series</span><span class="chart-info">Scroll</span></div>
+          <div class="chart-body" id="legend-many-series"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Labels -->
+    <div class="section">
+      <h2 class="section-title">Labels</h2>
+      <p class="section-description">textColor, labelSize, gridColor</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Default</span></div>
+          <div class="chart-body" id="labels-default"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">labelSize: 10</span></div>
+          <div class="chart-body" id="labels-small"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">gridColor: accent</span></div>
+          <div class="chart-body" id="labels-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zoom -->
+    <div class="section">
+      <h2 class="section-title">Zoom</h2>
+      <p class="section-description">zoomMode: both | x-only | y-only | none</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">both</span><span class="chart-info">Pan & zoom</span></div>
+          <div class="chart-body" id="zoom-both"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">x-only</span><span class="chart-info">Horizontal</span></div>
+          <div class="chart-body" id="zoom-x"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">y-only</span><span class="chart-info">Vertical</span></div>
+          <div class="chart-body" id="zoom-y"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">none</span><span class="chart-info">Disabled</span></div>
+          <div class="chart-body" id="zoom-none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hover -->
+    <div class="section">
+      <h2 class="section-title">Hover</h2>
+      <p class="section-description">showTooltip, formatX, formatY, pillDecayMs</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">showTooltip: true</span></div>
+          <div class="chart-body" id="hover-tooltip"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">showTooltip: false</span></div>
+          <div class="chart-body" id="hover-no-tooltip"></div>
         </div>
       </div>
     </div>

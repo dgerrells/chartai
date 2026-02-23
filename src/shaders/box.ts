@@ -1,6 +1,7 @@
 import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
 
 export const BOX_COMPUTE_SHADER = `${UNIFORM_STRUCT}
+struct BarUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
 struct BarData {
 screenX: f32,
 minY: f32,
@@ -13,6 +14,7 @@ barWidth: f32,
 @group(0) @binding(3) var<storage, read_write> barData: array<BarData>;
 @group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
 @group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
+@group(0) @binding(6) var<uniform> bu: BarUniforms;
 ${BINARY_SEARCH}
 fn barHalfWidth(idx: u32, count: u32) -> f32 {
 if (count <= 1u) {
@@ -98,7 +100,7 @@ return;
 var dataMinY = dataY[startIdx];
 var dataMaxY = dataY[startIdx];
 let rangeCount = endIdx - startIdx;
-let maxSamples = u.maxSamplesPerPixel;
+let maxSamples = bu.maxSamplesPerPixel;
 if (maxSamples > 0u && rangeCount > maxSamples) {
 let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
 for (var s = 0u; s < maxSamples; s++) {

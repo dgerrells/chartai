@@ -1,36 +1,36 @@
 // ChartAI Landing Page
 
-import { ChartManager, registerPlugin } from "../src/chart-library.ts";
-import type { ChartSeries } from "../src/chart-library.ts";
+import { ChartManager as manager } from "../src/chart-library.ts";
+import type { Chart } from "../src/chart-library.ts";
+import type { ChartSeries } from "../src/types.ts";
 import { labelsPlugin } from "../src/plugins/labels.ts";
 import { zoomPlugin } from "../src/plugins/zoom.ts";
 import { hoverPlugin } from "../src/plugins/hover.ts";
-
-registerPlugin(labelsPlugin);
-registerPlugin(zoomPlugin());
-registerPlugin(hoverPlugin);
+import { legendPlugin } from "../src/plugins/legend.ts";
+import { LineChart } from "../src/charts/line.ts";
+import { AreaChart } from "../src/charts/area.ts";
+import { ScatterChart } from "../src/charts/scatter.ts";
+import { BarChart } from "../src/charts/bar.ts";
 
 type DataPattern = "stock" | "trending" | "declining" | "spikey" | "cyclic";
 
-let manager: ChartManager;
+// manager is the imported singleton
 let isDark = document.documentElement.classList.contains("dark");
 
-// Live update state
-let liveUpdateSpeed = 1; // per second
+let liveUpdateSpeed = 1;
 let liveUpdateInterval: number | null = null;
-let liveAccumulate = false; // accumulate vs ring buffer
-let liveLineId: string;
-let liveScatterId: string;
-let liveLine2Id: string;
+let liveAccumulate = false;
+let liveLine: Chart;
+let liveScatter: Chart;
+let liveLine2: Chart;
 let liveDataX: number[] = [];
 let liveDataY1: number[] = [];
 let liveDataY2: number[] = [];
 let liveDataY3: number[] = [];
 
-// Big data chart IDs
-let bigdataLineId: string | null = null;
-let bigdataScatterId: string | null = null;
-let bigseriesLineId: string | null = null;
+let bigdataLine: Chart | null = null;
+let bigdataScatter: Chart | null = null;
+let bigseriesLine: Chart | null = null;
 
 function hslToRgb(
   h: number,
@@ -277,9 +277,16 @@ function generateData(
 }
 
 async function init() {
-  manager = ChartManager.getInstance();
-  const success = await manager.init();
+  manager.use(LineChart);
+  manager.use(AreaChart);
+  manager.use(ScatterChart);
+  manager.use(BarChart);
+  manager.use(labelsPlugin);
+  manager.use(zoomPlugin());
+  manager.use(hoverPlugin);
+  manager.use(legendPlugin);
 
+  const success = await manager.init();
   if (!success) {
     alert("WebGPU not available. Please use a supported browser.");
     return;
@@ -292,6 +299,10 @@ async function init() {
   createLiveCharts();
   setupBigDataControls();
   setupBigSeriesControls();
+  createLegendDemoCharts();
+  createLabelsDemoCharts();
+  createZoomDemoCharts();
+  createHoverDemoCharts();
 }
 
 function createBasicCharts() {
@@ -317,7 +328,7 @@ function createBasicCharts() {
   const lineData = generateData(1000, "trending");
   // Convert X to date-based format (minutes ago)
   const lineDateX = lineData.x.map((_, i) => 1000 - 1 - i);
-  manager.create({
+  const chart = manager.create({
     type: "line",
     container: document.getElementById("basic-line")!,
     series: [
@@ -350,17 +361,34 @@ function createBasicCharts() {
     formatY: formatNumber,
     showTooltip: true,
   });
+
+  // Area chart - filled line down to baseline
+  const areaData = generateData(1000, "trending");
+  manager.create({
+    type: "area",
+    container: document.getElementById("basic-area")!,
+    series: [
+      {
+        label: "Filled Area",
+        color: { r: 0.2, g: 0.7, b: 0.5 },
+        x: areaData.x,
+        y: areaData.y,
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
 }
 
 function createSeriesCharts() {
   // Bar chart - 25 points × 3 series (same pattern, varying heights)
   const barSeries: ChartSeries[] = [];
-  const baseData = generateData(25, "trending");
-  const heightMultipliers = [1.0, 0.7, 1.3]; // Slight height variations
-  
+  const heightMultipliers = [1.0, 0.7, 1.3];
+
   for (let i = 0; i < 3; i++) {
     const data = generateData(25, "trending");
-    const adjustedY = data.y.map(val => val * heightMultipliers[i]);
+    const adjustedY = data.y.map((val) => val * heightMultipliers[i]);
     barSeries.push({
       label: `Series ${i + 1}`,
       color: randomColor(),
@@ -418,6 +446,26 @@ function createSeriesCharts() {
     formatY: formatNumber,
     showTooltip: true,
   });
+
+  // Area chart - 3 series with filled areas
+  const areaSeries: ChartSeries[] = [];
+  for (let i = 0; i < 3; i++) {
+    const data = generateData(1000, "trending");
+    areaSeries.push({
+      label: `Series ${i + 1}`,
+      color: randomColor(),
+      x: data.x,
+      y: data.y,
+    });
+  }
+  manager.create({
+    type: "area",
+    container: document.getElementById("series-area")!,
+    series: areaSeries,
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
 }
 
 function createSpikesChart() {
@@ -444,13 +492,13 @@ function createLiveCharts() {
   const initialData1 = generateData(100, "trending");
   const initialData2 = generateData(100, "trending");
   const initialData3 = generateData(100, "trending");
-  
+
   liveDataX = Array.from({ length: 100 }, (_, i) => i);
   liveDataY1 = [...initialData1.y];
   liveDataY2 = [...initialData2.y];
   liveDataY3 = [...initialData3.y];
 
-  liveLineId = manager.create({
+  liveLine = manager.create({
     type: "line",
     container: document.getElementById("live-line")!,
     series: [
@@ -466,7 +514,7 @@ function createLiveCharts() {
     showTooltip: true,
   });
 
-  liveScatterId = manager.create({
+  liveScatter = manager.create({
     type: "scatter",
     container: document.getElementById("live-scatter")!,
     series: [
@@ -482,7 +530,7 @@ function createLiveCharts() {
     showTooltip: true,
   });
 
-  liveLine2Id = manager.create({
+  liveLine2 = manager.create({
     type: "line",
     container: document.getElementById("live-line2")!,
     series: [
@@ -510,7 +558,9 @@ function createLiveCharts() {
   });
 
   // Setup accumulate toggle
-  const accumulateToggle = document.getElementById("accumulate-toggle") as HTMLInputElement;
+  const accumulateToggle = document.getElementById(
+    "accumulate-toggle",
+  ) as HTMLInputElement;
   accumulateToggle.addEventListener("change", () => {
     liveAccumulate = accumulateToggle.checked;
   });
@@ -526,11 +576,15 @@ function startLiveUpdate() {
 
   const intervalMs = 1000 / liveUpdateSpeed;
   liveUpdateInterval = window.setInterval(() => {
-    const nextX = liveDataX.length > 0 ? liveDataX[liveDataX.length - 1] + 1 : 0;
-    const lastY1 = liveDataY1.length > 0 ? liveDataY1[liveDataY1.length - 1] : 50;
-    const lastY2 = liveDataY2.length > 0 ? liveDataY2[liveDataY2.length - 1] : 50;
-    const lastY3 = liveDataY3.length > 0 ? liveDataY3[liveDataY3.length - 1] : 50;
-    
+    const nextX =
+      liveDataX.length > 0 ? liveDataX[liveDataX.length - 1] + 1 : 0;
+    const lastY1 =
+      liveDataY1.length > 0 ? liveDataY1[liveDataY1.length - 1] : 50;
+    const lastY2 =
+      liveDataY2.length > 0 ? liveDataY2[liveDataY2.length - 1] : 50;
+    const lastY3 =
+      liveDataY3.length > 0 ? liveDataY3[liveDataY3.length - 1] : 50;
+
     // Generate new points with random walk
     liveDataX.push(nextX);
     liveDataY1.push(lastY1 + (Math.random() - 0.5) * 5);
@@ -545,8 +599,7 @@ function startLiveUpdate() {
       liveDataY3.shift();
     }
 
-    // Update charts
-    manager.updateSeries(liveLineId, [
+    liveLine.setData([
       {
         label: "Live Data",
         color: { r: 0.2, g: 0.8, b: 0.4 },
@@ -554,8 +607,7 @@ function startLiveUpdate() {
         y: [...liveDataY1],
       },
     ]);
-
-    manager.updateSeries(liveScatterId, [
+    liveScatter.setData([
       {
         label: "Live Data",
         color: { r: 0.9, g: 0.3, b: 0.7 },
@@ -563,8 +615,7 @@ function startLiveUpdate() {
         y: [...liveDataY2],
       },
     ]);
-
-    manager.updateSeries(liveLine2Id, [
+    liveLine2.setData([
       {
         label: "Live Data",
         color: { r: 0.4, g: 0.5, b: 1 },
@@ -575,13 +626,16 @@ function startLiveUpdate() {
 
     // Update stats
     const mode = liveAccumulate ? "Accumulate" : "Ring Buffer";
-    document.getElementById("live-stats")!.textContent = `Points: ${liveDataX.length} (${mode})`;
+    document.getElementById("live-stats")!.textContent =
+      `Points: ${liveDataX.length} (${mode})`;
   }, intervalMs);
 }
 
 function setupBigDataControls() {
   const generateBtn = document.getElementById("bigdata-generate")!;
-  const countInput = document.getElementById("bigdata-count") as HTMLInputElement;
+  const countInput = document.getElementById(
+    "bigdata-count",
+  ) as HTMLInputElement;
   const statsDiv = document.getElementById("bigdata-stats")!;
 
   generateBtn.addEventListener("click", () => {
@@ -592,17 +646,15 @@ function setupBigDataControls() {
     setTimeout(() => {
       const t0 = performance.now();
 
-      // Destroy old charts if they exist
-      if (bigdataLineId) manager.destroy(bigdataLineId);
-      if (bigdataScatterId) manager.destroy(bigdataScatterId);
+      bigdataLine?.destroy();
+      bigdataScatter?.destroy();
 
       // Generate data with stock pattern for line
       const lineData = generateData(count, "stock");
       // Generate cyclic pattern for scatter
       const scatterData = generateData(count, "cyclic");
 
-      // Create line chart
-      bigdataLineId = manager.create({
+      bigdataLine = manager.create({
         type: "line",
         container: document.getElementById("bigdata-line")!,
         series: [
@@ -618,8 +670,7 @@ function setupBigDataControls() {
         showTooltip: true,
       });
 
-      // Create scatter chart
-      bigdataScatterId = manager.create({
+      bigdataScatter = manager.create({
         type: "scatter",
         container: document.getElementById("bigdata-scatter")!,
         series: [
@@ -637,9 +688,11 @@ function setupBigDataControls() {
 
       const elapsed = performance.now() - t0;
       const countFormatted = (count / 1e6).toFixed(1) + "M";
-      
-      document.getElementById("bigdata-line-info")!.textContent = countFormatted;
-      document.getElementById("bigdata-scatter-info")!.textContent = countFormatted;
+
+      document.getElementById("bigdata-line-info")!.textContent =
+        countFormatted;
+      document.getElementById("bigdata-scatter-info")!.textContent =
+        countFormatted;
       statsDiv.textContent = `Generated in ${elapsed.toFixed(0)}ms`;
       generateBtn.removeAttribute("disabled");
     }, 50);
@@ -648,22 +701,25 @@ function setupBigDataControls() {
 
 function setupBigSeriesControls() {
   const generateBtn = document.getElementById("bigseries-generate")!;
-  const seriesInput = document.getElementById("bigseries-series") as HTMLInputElement;
-  const pointsInput = document.getElementById("bigseries-points") as HTMLInputElement;
+  const seriesInput = document.getElementById(
+    "bigseries-series",
+  ) as HTMLInputElement;
+  const pointsInput = document.getElementById(
+    "bigseries-points",
+  ) as HTMLInputElement;
   const statsDiv = document.getElementById("bigseries-stats")!;
 
   generateBtn.addEventListener("click", () => {
     const seriesCount = parseInt(seriesInput.value) || 1000;
     const pointsPerSeries = parseInt(pointsInput.value) || 1000;
-    
+
     generateBtn.setAttribute("disabled", "true");
     statsDiv.textContent = "Generating...";
 
     setTimeout(() => {
       const t0 = performance.now();
 
-      // Destroy old chart if it exists
-      if (bigseriesLineId) manager.destroy(bigseriesLineId);
+      bigseriesLine?.destroy();
 
       // Generate series with trending patterns
       const series: ChartSeries[] = [];
@@ -679,8 +735,7 @@ function setupBigSeriesControls() {
         });
       }
 
-      // Create chart
-      bigseriesLineId = manager.create({
+      bigseriesLine = manager.create({
         type: "line",
         container: document.getElementById("bigseries-line")!,
         series,
@@ -691,15 +746,176 @@ function setupBigSeriesControls() {
 
       const elapsed = performance.now() - t0;
       const totalPoints = seriesCount * pointsPerSeries;
-      const formatted = totalPoints >= 1e6 
-        ? (totalPoints / 1e6).toFixed(1) + "M" 
-        : (totalPoints / 1e3).toFixed(0) + "k";
-      
-      document.getElementById("bigseries-info")!.textContent = 
+      const formatted =
+        totalPoints >= 1e6
+          ? (totalPoints / 1e6).toFixed(1) + "M"
+          : (totalPoints / 1e3).toFixed(0) + "k";
+
+      document.getElementById("bigseries-info")!.textContent =
         `${seriesCount} series × ${pointsPerSeries} pts = ${formatted} total`;
       statsDiv.textContent = `Generated in ${elapsed.toFixed(0)}ms`;
       generateBtn.removeAttribute("disabled");
     }, 50);
+  });
+}
+
+function createLegendDemoCharts() {
+  const lineData3 = generateData(500, "trending");
+  const lineDateX = lineData3.x.map((_, i) => 500 - 1 - i);
+  const series3: ChartSeries[] = [];
+  for (let i = 0; i < 3; i++) {
+    const data = generateData(500, "trending");
+    series3.push({
+      label: `Series ${i + 1}`,
+      color: randomColor(),
+      x: lineDateX,
+      y: data.y,
+    });
+  }
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("legend-default")!,
+    series: series3,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    legend: {},
+  });
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("legend-default-open")!,
+    series: series3,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    legend: { defaultOpen: true },
+  });
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("legend-always-open")!,
+    series: series3,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    legend: { alwaysOpen: true },
+  });
+
+  const series12: ChartSeries[] = [];
+  for (let i = 0; i < 12; i++) {
+    const data = generateData(300, "trending");
+    const lineDateX12 = data.x.map((_, idx) => 300 - 1 - idx);
+    series12.push({
+      label: `Series ${i + 1}`,
+      color: randomColor(),
+      x: lineDateX12,
+      y: data.y,
+    });
+  }
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("legend-many-series")!,
+    series: series12,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    legend: { defaultOpen: true },
+  });
+}
+
+function createLabelsDemoCharts() {
+  const data = generateData(200, "trending");
+  const lineDateX = data.x.map((_, i) => 200 - 1 - i);
+  const series = [
+    { label: "S1", color: randomColor(), x: lineDateX, y: data.y },
+  ];
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("labels-default")!,
+    series,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("labels-small")!,
+    series,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    labelSize: 10,
+  });
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("labels-grid")!,
+    series,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+    gridColor: "rgba(100, 150, 255, 0.3)",
+  });
+}
+
+function createZoomDemoCharts() {
+  const data = generateData(300, "trending");
+  const lineDateX = data.x.map((_, i) => 300 - 1 - i);
+  const series = [
+    { label: "S1", color: randomColor(), x: lineDateX, y: data.y },
+  ];
+  const base = { type: "line" as const, series, formatX: formatDate, formatY: formatPrice, showTooltip: true };
+
+  manager.create({
+    ...base,
+    container: document.getElementById("zoom-both")!,
+    zoomMode: "both",
+  });
+  manager.create({
+    ...base,
+    container: document.getElementById("zoom-x")!,
+    zoomMode: "x-only",
+  });
+  manager.create({
+    ...base,
+    container: document.getElementById("zoom-y")!,
+    zoomMode: "y-only",
+  });
+  manager.create({
+    ...base,
+    container: document.getElementById("zoom-none")!,
+    zoomMode: "none",
+  });
+}
+
+function createHoverDemoCharts() {
+  const data = generateData(200, "trending");
+  const lineDateX = data.x.map((_, i) => 200 - 1 - i);
+  const series = [
+    { label: "S1", color: randomColor(), x: lineDateX, y: data.y },
+  ];
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("hover-tooltip")!,
+    series,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+
+  manager.create({
+    type: "line",
+    container: document.getElementById("hover-no-tooltip")!,
+    series,
+    formatX: formatDate,
+    formatY: formatPrice,
+    showTooltip: false,
   });
 }
 

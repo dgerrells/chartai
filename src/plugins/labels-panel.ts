@@ -1,5 +1,11 @@
-import type { ChartPlugin, InternalChart } from "../chart-library.ts";
+import type { ChartPlugin, ChartConfig, InternalChart } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
+import { MARGIN } from "./shared.ts";
+import {
+  DEFAULT_FONT,
+  DEFAULT_LABEL_SIZE,
+  type LabelsConfig,
+} from "./labels.ts";
 
 const niceTicks = (min: number, max: number, count: number) => {
   const range = max - min;
@@ -13,11 +19,10 @@ const niceTicks = (min: number, max: number, count: number) => {
   return ticks;
 };
 
-const getViewState = (chart: InternalChart) => {
-  const mgr = ChartManager.getInstance(),
-    w = chart.width,
+const getViewState = (chart: InternalChart<ChartConfig & LabelsConfig>) => {
+  const w = chart.width,
     h = chart.height,
-    m = ChartManager.MARGIN;
+    m = MARGIN;
   const { bounds: b, view: v } = chart,
     fullX = b.maxX - b.minX,
     fullY = b.maxY - b.minY;
@@ -26,7 +31,8 @@ const getViewState = (chart: InternalChart) => {
   const mx = b.minX + v.panX * fullX,
     my = b.minY + v.panY * fullY;
   const bgc =
-    chart.bgColor ?? (mgr.isDark ? [0.11, 0.11, 0.12] : [0.98, 0.98, 0.98]);
+    chart.config.bgColor ??
+    (ChartManager.isDark ? [0.11, 0.11, 0.12] : [0.98, 0.98, 0.98]);
   return {
     w,
     h,
@@ -37,16 +43,17 @@ const getViewState = (chart: InternalChart) => {
     my,
     bg: `rgb(${Math.round(bgc[0] * 255)},${Math.round(bgc[1] * 255)},${Math.round(bgc[2] * 255)})`,
     bgAlpha: `rgba(${Math.round(bgc[0] * 255)},${Math.round(bgc[1] * 255)},${Math.round(bgc[2] * 255)},0.95)`,
-    border: mgr.isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-    font: chart.fontFamily ?? ChartManager.DEFAULT_FONT,
-    text: chart.textColor ?? (mgr.isDark ? "#c0c0c0" : "#333333"),
+    border: ChartManager.isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+    font: chart.config.fontFamily ?? DEFAULT_FONT,
+    text:
+      chart.config.textColor ?? (ChartManager.isDark ? "#c0c0c0" : "#333333"),
     grid:
-      chart.gridColor ??
-      (mgr.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"),
+      chart.config.gridColor ??
+      (ChartManager.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"),
   };
 };
 
-export const labelsPanelPlugin: ChartPlugin = {
+export const labelsPanelPlugin: ChartPlugin<LabelsConfig> = {
   name: "labels-panel",
 
   beforeDraw(ctx, chart) {
@@ -79,51 +86,33 @@ export const labelsPanelPlugin: ChartPlugin = {
     const {
       formatX = String,
       formatY = String,
-      labelSize = ChartManager.DEFAULT_LABEL_SIZE,
+      labelSize = DEFAULT_LABEL_SIZE,
     } = chart.config;
 
-    // Draw left panel background
     ctx.fillStyle = bgAlpha;
     ctx.fillRect(0, 0, m.left, h - m.bottom);
-    
-    // Draw bottom panel background
     ctx.fillRect(0, h - m.bottom, w, m.bottom);
 
-    // Draw borders carefully - each line segment drawn once
     ctx.strokeStyle = border;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    
-    // Top edge of left panel
     ctx.moveTo(0, 0);
     ctx.lineTo(m.left, 0);
-    
-    // Right edge of left panel
     ctx.moveTo(m.left, 0);
     ctx.lineTo(m.left, h - m.bottom);
-    
-    // Left edge (full height)
     ctx.moveTo(0, 0);
     ctx.lineTo(0, h);
-    
-    // Bottom edge (full width)
     ctx.moveTo(0, h);
     ctx.lineTo(w, h);
-    
-    // Top edge of bottom panel (starting from where left panel ends)
     ctx.moveTo(m.left, h - m.bottom);
     ctx.lineTo(w, h - m.bottom);
-    
-    // Right edge of bottom panel
     ctx.moveTo(w, h - m.bottom);
     ctx.lineTo(w, h);
-    
     ctx.stroke();
 
     ctx.font = `${labelSize}px ${font}`;
     ctx.fillStyle = text;
 
-    // Y Labels - centered in left panel
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     niceTicks(my, my + ry, 7).forEach((v) => {
@@ -132,7 +121,6 @@ export const labelsPanelPlugin: ChartPlugin = {
         ctx.fillText(formatY(v), m.left / 2, y);
     });
 
-    // X Labels - biased towards top of bottom panel
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
     niceTicks(mx, mx + rx, 8).forEach((v) => {
