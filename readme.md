@@ -116,3 +116,9 @@ To demonstrate just how well it works there is a boids simulation chart where th
 * WebGPU - this uses it so if it isn't there it will not work. No fallback is provided as the intent is for this library to be tiny and lean. 
 * Appending data - Updating data is plenty fast even with larger datasets but it could be smarter. It doesn't support having a larger buffer size and only sending updated data. It is a full update internally for now.
 * Workers - The library will try and inline bundle the worker for maximum simplicity. If it fails, it will fallback to standard es worker loading.
+
+### Contribution
+
+I test using bun which handles most of the bundling out of the box.
+
+You can start a server watching files by running `bun server.ts`.
