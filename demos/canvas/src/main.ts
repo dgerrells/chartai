@@ -1,4 +1,4 @@
-// Chartai Canvas Demo — Infinite canvas with draggable, resizable chart tiles
+// chartai Canvas Demo — Infinite canvas with draggable, resizable chart tiles
 
 import { ChartManager as manager, Chart } from "/src/chart-library.ts";
 import type { ChartConfig, ChartSeries } from "/src/types.ts";
@@ -1305,7 +1305,7 @@ function createTileElement(chart: CanvasChart): HTMLElement {
     pointSlider.addEventListener("input", () => {
       const size = parseInt(pointSlider.value);
       pointLabel.textContent = size + "px";
-      chart.chart?.setPointSize(size);
+      chart.chart?.configure({ pointSize: size });
     });
     pointSlider.addEventListener("mousedown", (e) => e.stopPropagation());
   }

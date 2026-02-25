@@ -36,7 +36,6 @@ interface WorkerRendererConfig {
   shaders: Record<string, string>;
   passes: SerializedPassDef[];
   bufferDefs: SerializedBufferDef[];
-  seriesFields: string[];
   uniformDefs: UniformDef[];
 }
 
@@ -284,12 +283,17 @@ function writeUniforms(chart: Chart, series: ChartSeriesData): void {
 function writeCustomUniforms(chart: Chart, config: WorkerRendererConfig): void {
   if (!chart.customUniformBuffer || config.uniformDefs.length === 0) return;
   const n = config.uniformDefs.length;
-  const data = new Float32Array(Math.ceil(n * 4 / 16) * 4);
+  const byteCount = Math.ceil(n * 4 / 16) * 16;
+  const buffer = new ArrayBuffer(byteCount);
+  const f32 = new Float32Array(buffer);
+  const u32 = new Uint32Array(buffer);
   for (let i = 0; i < n; i++) {
     const def = config.uniformDefs[i];
-    data[i] = chart.customUniformValues[def.name] ?? def.default;
+    const val = chart.customUniformValues[def.name] ?? def.default;
+    if (def.type === "u32") u32[i] = val >>> 0;
+    else f32[i] = val;
   }
-  device.queue.writeBuffer(chart.customUniformBuffer, 0, data);
+  device.queue.writeBuffer(chart.customUniformBuffer, 0, buffer);
 }
 
 function allocateChartBuffers(
@@ -473,10 +477,6 @@ function renderChart(chart: Chart): void {
 
           const meta = chart.perSeriesPassMeta[si]?.[passIdx];
           const dispatch = meta?.dispatch ?? { x: 1 };
-
-          if (dispatch.xCount !== undefined && chart.customUniformBuffer) {
-            device.queue.writeBuffer(chart.customUniformBuffer, 0, new Uint32Array([dispatch.xCount]));
-          }
 
           const bg = series.passBindGroups[passIdx];
           if (!bg) continue;
@@ -739,7 +739,6 @@ function processUpdateSeries(
     }
 
     buildAllBindGroups(chart, renderer);
-    postMessage({ type: M.BOUNDS_UPDATE, id, ...bounds });
   } catch (e) {
     postMessage({ type: M.ERROR, code: E.UPDATE });
   }
@@ -769,7 +768,6 @@ self.onmessage = async (e: MessageEvent) => {
         shaders: data.shaders,
         passes: data.passes,
         bufferDefs: data.bufferDefs ?? [],
-        seriesFields: data.seriesFields ?? [],
         uniformDefs: data.uniformDefs ?? [],
       };
       try {

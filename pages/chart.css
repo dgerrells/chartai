@@ -8,8 +8,10 @@
   --text-secondary: #5f6368;
   --text-muted: #9aa0a6;
   --border-color: #e8eaed;
-  --accent: #1a73e8;
-  --accent-hover: #1557b0;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-bg: #0f766e;
+  --accent-bg-hover: #0d5c52;
   --danger: #ea4335;
   --success: #34a853;
   --warning: #fbbc04;
@@ -29,8 +31,10 @@
   --text-secondary: #9aa0a6;
   --text-muted: #5f6368;
   --border-color: #3c4043;
-  --accent: #8ab4f8;
-  --accent-hover: #aecbfa;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-bg: #14b8a6;
+  --accent-bg-hover: #2dd4bf;
   --chart-bg: #1e1e1e;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -234,12 +238,14 @@ body {
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: white;
+  background: var(--bg-secondary);
+  color: var(--accent);
+  border: 1px solid var(--border-color);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
 }
 
 .btn-secondary {
@@ -292,9 +298,10 @@ body {
   width: 44px;
   height: 24px;
   background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   position: relative;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .toggle-slider::after {
@@ -302,20 +309,28 @@ body {
   position: absolute;
   width: 18px;
   height: 18px;
-  background: white;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
-  top: 3px;
+  top: 50%;
   left: 3px;
+  transform: translateY(-50%);
   transition: transform 0.2s;
   box-shadow: var(--shadow-sm);
 }
 
 .toggle input:checked + .toggle-slider {
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary));
+  border: 1px solid var(--accent);
 }
 
 .toggle input:checked + .toggle-slider::after {
-  transform: translateX(20px);
+  transform: translateY(-50%) translateX(20px);
+}
+
+.dark .toggle-slider::after {
+  background: #fff;
+  border-color: transparent;
 }
 
 .toggle-label {
@@ -457,11 +472,12 @@ body {
   color: var(--text-muted);
   background: var(--bg-tertiary);
   padding: 4px 8px;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition:
     background 0.15s,
-    color 0.15s;
+    color 0.15s,
+    border-color 0.15s;
   min-width: 24px;
 }
 
@@ -474,12 +490,15 @@ body {
 }
 
 .zoom-axis-btn.active {
-  background: var(--accent);
-  color: white;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
 }
 
 .zoom-axis-btn.active:hover {
-  background: var(--accent-hover);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
 .chart-card-actions {
@@ -570,6 +589,7 @@ body {
 
 .zoom-axis-btn:not(.active) {
   opacity: 0.5;
+  box-shadow: none;
 }
 
 /* Toast */

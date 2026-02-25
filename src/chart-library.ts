@@ -15,6 +15,10 @@ export type {
   ChartStats,
   InternalChart,
   BufferUsage,
+  BlendFactor,
+  BlendOperation,
+  BlendComponent,
+  BlendState,
 } from "./types.ts";
 
 import type {
@@ -88,6 +92,7 @@ export class Chart<C extends ChartConfig = ChartConfig> {
       });
     }
 
+    this._mgr.requestRender(this.id);
     this._mgr.drawChart(c);
   }
 
@@ -285,7 +290,7 @@ class _ChartManager {
           resolve(true);
           break;
         case M.ERROR:
-          console.error("ChartAI:", data.code);
+          console.error("chartai:", data.code);
           resolve(false);
           break;
         case M.STATS:
@@ -297,23 +302,10 @@ class _ChartManager {
           };
           for (const cb of this.statsCallbacks) cb(this.currentStats);
           break;
-        case M.BOUNDS_UPDATE: {
-          const chart = this.charts.get(data.id);
-          if (chart) {
-            chart.bounds = {
-              minX: data.minX,
-              maxX: data.maxX,
-              minY: data.minY,
-              maxY: data.maxY,
-            };
-            this.drawChart(chart);
-          }
-          break;
-        }
       }
     };
     this.worker.onerror = (e) => {
-      console.error("ChartAI:", e);
+      console.error("chartai:", e);
       resolve(false);
     };
     this.worker.postMessage({ type: M.INIT, isDark: this._isDark });
@@ -343,7 +335,6 @@ class _ChartManager {
         blend: p.blend,
       })),
       bufferDefs,
-      seriesFields: renderer.seriesFields ?? [],
       uniformDefs: renderer.uniforms ?? [],
     });
   }
@@ -380,6 +371,7 @@ class _ChartManager {
         width: physW,
         height: physH,
         samples: s.rawX.length,
+        seriesCount: series.length,
         bounds: chart.bounds,
         view: chart.view,
       };
@@ -462,7 +454,6 @@ class _ChartManager {
       const v = (config as Record<string, unknown>)[u.name];
       customUniforms[u.name] = typeof v === "number" ? v : u.default;
     }
-
     const chart: InternalChart<any> = {
       id,
       config,
@@ -508,6 +499,7 @@ class _ChartManager {
     this.resizeObserver.observe(wrap);
 
     for (const plugin of chart.plugins) plugin.install?.(chart, wrap);
+    renderer.install?.(chart, wrap);
 
     this.updateSeries(id, config.series);
     return new Chart<any>(id, this);
@@ -516,6 +508,7 @@ class _ChartManager {
   destroy(id: string): void {
     const chart = this.charts.get(id);
     if (!chart) return;
+    chart.renderer.uninstall?.(chart);
     for (const p of chart.plugins) p.uninstall?.(chart);
     this.visibilityObserver.unobserve(chart.el);
     const wrap = chart.el.querySelector("div");
@@ -549,39 +542,40 @@ class _ChartManager {
           extra[key] = idx.map((i) => s[key][i]);
         }
       }
-      const stride = chart.renderer.packedYStride;
       return {
         label: s.label,
         color,
         rawX: idx.map((i) => s.x[i]),
-        rawY: stride
-          ? idx.flatMap((i) => Array.from({ length: stride }, (_, k) => s.y[i * stride + k]))
-          : idx.map((i) => s.y[i]),
+        rawY: idx.map((i) => s.y[i]),
         extra,
       };
     });
 
-    let minX = Infinity,
-      maxX = -Infinity,
-      minY = Infinity,
-      maxY = -Infinity;
-    for (const s of chart.series) {
-      for (let i = 0; i < s.rawX.length; i++) {
-        if (s.rawX[i] < minX) minX = s.rawX[i];
-        if (s.rawX[i] > maxX) maxX = s.rawX[i];
-      }
-      for (let i = 0; i < s.rawY.length; i++) {
-        if (s.rawY[i] < minY) minY = s.rawY[i];
-        if (s.rawY[i] > maxY) maxY = s.rawY[i];
-      }
-    }
-
-    const px = (maxX - minX) * 0.05 || 1;
-    const py = (maxY - minY) * 0.1 || 1;
-    minX -= px;
-    maxX += px;
-    minY -= py;
-    maxY += py;
+    const customBounds = chart.renderer.computeBounds?.(chart.series);
+    let { minX, maxX, minY, maxY } =
+      customBounds ??
+      (() => {
+        let minX = Infinity,
+          maxX = -Infinity,
+          minY = Infinity,
+          maxY = -Infinity;
+        for (const s of chart.series) {
+          for (let i = 0; i < s.rawX.length; i++) {
+            if (s.rawX[i] < minX) minX = s.rawX[i];
+            if (s.rawX[i] > maxX) maxX = s.rawX[i];
+            if (s.rawY[i] < minY) minY = s.rawY[i];
+            if (s.rawY[i] > maxY) maxY = s.rawY[i];
+          }
+        }
+        const px = (maxX - minX) * 0.05 || 1;
+        const py = (maxY - minY) * 0.1 || 1;
+        return {
+          minX: minX - px,
+          maxX: maxX + px,
+          minY: minY - py,
+          maxY: maxY + py,
+        };
+      })();
 
     const db = chart.config.defaultBounds;
     if (db) {
@@ -677,7 +671,12 @@ class _ChartManager {
     requestAnimationFrame(animate);
   }
 
-  sendViewTransform(chart: InternalChart<any>): void {
+  requestRender(id: string): void {
+    const chart = this.charts.get(id);
+    if (chart) this.sendViewTransform(chart);
+  }
+
+  private sendViewTransform(chart: InternalChart<any>): void {
     this.worker?.postMessage({
       type: M.VIEW_TRANSFORM,
       id: chart.id,

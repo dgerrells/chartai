@@ -93,7 +93,7 @@ export function zoomPlugin(
         edgeScaleInitialZoom = 1;
 
       const sendView = () => {
-        mgr.sendViewTransform(chart);
+        mgr.requestRender(chart.id);
         mgr.drawChart(chart);
         if (mgr.syncViews) mgr.syncAllViews(chart);
       };

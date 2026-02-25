@@ -2,6 +2,7 @@ import type { ChartPlugin, InternalChart, HoverData } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
 import { DEFAULT_FONT } from "./labels.ts";
 import { MARGIN } from "./shared.ts";
+import { dataToScreen, screenToData } from "./coords.ts";
 
 const MAX_HOVER_PX = 50;
 
@@ -13,14 +14,10 @@ function findNearestPoint(
   height: number,
 ): HoverData | null {
   if (chart.series.length === 0) return null;
+  const { x: dataX, y: dataY } = screenToData(screenX, screenY, chart, width, height);
   const rX = chart.bounds.maxX - chart.bounds.minX;
-  const rY = chart.bounds.maxY - chart.bounds.minY;
   const vW = rX / chart.view.zoomX;
-  const vH = rY / chart.view.zoomY;
   const vMinX = chart.bounds.minX + chart.view.panX * rX;
-  const vMinY = chart.bounds.minY + chart.view.panY * rY;
-  const dataX = vMinX + (screenX / width) * vW;
-  const dataY = vMinY + (1 - screenY / height) * vH;
 
   let bsi = -1,
     bi = -1,
@@ -200,21 +197,7 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
       fontFamily = DEFAULT_FONT,
     } = chart.config;
 
-    const rx = (chart.bounds.maxX - chart.bounds.minX) / chart.view.zoomX;
-    const ry = (chart.bounds.maxY - chart.bounds.minY) / chart.view.zoomY;
-    const px =
-      ((hvr.x -
-        (chart.bounds.minX +
-          chart.view.panX * (chart.bounds.maxX - chart.bounds.minX))) /
-        rx) *
-      w;
-    const py =
-      h *
-      (1 -
-        (hvr.y -
-          (chart.bounds.minY +
-            chart.view.panY * (chart.bounds.maxY - chart.bounds.minY))) /
-          ry);
+    const { x: px, y: py } = dataToScreen(hvr.x, hvr.y, chart, w, h);
 
     const mainSeries = chart.series[hvr.seriesIndex] || chart.series[0];
     const rgb = `${Math.round(mainSeries.color.r * 255)},${Math.round(mainSeries.color.g * 255)},${Math.round(mainSeries.color.b * 255)}`;

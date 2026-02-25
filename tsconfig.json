@@ -25,8 +25,10 @@
     "src/plugins/legend.ts",
     "src/plugins/zoom.ts",
     "src/charts/line.ts",
+    "src/charts/area.ts",
     "src/charts/scatter.ts",
     "src/charts/bar.ts",
+    "src/charts/candlestick.ts",
     "src/worker-inline.d.ts"
   ],
   "exclude": [

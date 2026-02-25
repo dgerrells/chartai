@@ -1,5 +1,27 @@
 export type ZoomMode = "both" | "x-only" | "y-only" | "none";
 
+export type BlendFactor =
+  | "zero" | "one"
+  | "src" | "one-minus-src"
+  | "src-alpha" | "one-minus-src-alpha"
+  | "dst" | "one-minus-dst"
+  | "dst-alpha" | "one-minus-dst-alpha"
+  | "src-alpha-saturated"
+  | "constant" | "one-minus-constant";
+
+export type BlendOperation = "add" | "subtract" | "reverse-subtract" | "min" | "max";
+
+export interface BlendComponent {
+  srcFactor?: BlendFactor;
+  dstFactor?: BlendFactor;
+  operation?: BlendOperation;
+}
+
+export interface BlendState {
+  color: BlendComponent;
+  alpha: BlendComponent;
+}
+
 export interface ChartColor { r: number; g: number; b: number; }
 
 export interface ChartSeries {
@@ -24,6 +46,7 @@ export interface RenderContext {
   width: number;
   height: number;
   samples: number;
+  seriesCount: number;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   view: { panX: number; panY: number; zoomX: number; zoomY: number };
 }
@@ -39,10 +62,10 @@ export interface PassDef {
   shader: string;
   bindings: BindingDef[];
   perSeries?: boolean;
-  dispatch?: (ctx: RenderContext) => { x: number; y?: number; z?: number; xCount?: number };
+  dispatch?: (ctx: RenderContext) => { x: number; y?: number; z?: number };
   topology?: string;
   loadOp?: "clear" | "load";
-  blend?: { color: any; alpha: any };
+  blend?: BlendState;
   draw?: (ctx: RenderContext) => number;
 }
 
@@ -61,7 +84,7 @@ export interface UniformDef {
 }
 
 export interface PassMeta {
-  dispatch?: { x: number; y?: number; z?: number; xCount?: number };
+  dispatch?: { x: number; y?: number; z?: number };
   draw?: number;
 }
 
@@ -135,9 +158,8 @@ export interface RendererPlugin {
   shaders: Record<string, string>;
   passes: PassDef[];
   buffers?: BufferDef[];
-  seriesFields?: string[];
   uniforms?: UniformDef[];
-  packedYStride?: number;  // e.g. 4 for OHLC
+  computeBounds?(series: Array<{ rawX: number[]; rawY: number[]; extra: Record<string, number[]> }>): { minX: number; maxX: number; minY: number; maxY: number };
   install?(chart: InternalChart<any>, el: HTMLElement): void;
   uninstall?(chart: InternalChart<any>): void;
 }

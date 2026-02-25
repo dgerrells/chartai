@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chartai</title>
+  <title>chartai</title>
   <link rel="stylesheet" href="chart.css">
   <script>
     const stored = localStorage.getItem('theme');
@@ -18,7 +18,7 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <h1 class="logo">Chartai</h1>
+        <h1 class="logo">chartai</h1>
       </div>
       <div class="header-stats">
         <div class="stat">
@@ -57,17 +57,19 @@
           <option value="line">Line</option>
           <option value="area">Area</option>
           <option value="bar">Bar</option>
+          <option value="candlestick">Candlestick</option>
+          <option value="boids">Boids</option>
         </select>
       </div>
 
       <div class="control-group">
         <label class="control-label">Points</label>
-        <input type="number" id="point-count" class="input" value="10000" min="10" step="1000">
+        <input type="number" id="point-count" class="input" value="1000" step="1000">
       </div>
 
       <div class="control-group">
         <label class="control-label">Series</label>
-        <input type="number" id="series-count" class="input" value="3" min="1" max="100" step="1">
+        <input type="number" id="series-count" class="input" value="3" min="1" step="1">
       </div>
 
       <div class="control-group">
@@ -109,6 +111,5 @@
   </div>
 
   <script type="module" src="main.ts"></script>
-</invoke>
 </body>
 </html>

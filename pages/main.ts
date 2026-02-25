@@ -1,4 +1,4 @@
-// ChartAI Landing Page
+// chartai Landing Page
 
 import { ChartManager as manager } from "../src/chart-library.ts";
 import type { Chart } from "../src/chart-library.ts";
@@ -11,6 +11,7 @@ import { LineChart } from "../src/charts/line.ts";
 import { AreaChart } from "../src/charts/area.ts";
 import { ScatterChart } from "../src/charts/scatter.ts";
 import { BarChart } from "../src/charts/bar.ts";
+import { CandlestickChart } from "../src/charts/candlestick.ts";
 
 type DataPattern = "stock" | "trending" | "declining" | "spikey" | "cyclic";
 
@@ -276,15 +277,66 @@ function generateData(
   return { x, y };
 }
 
+function generateOHLC(count: number): {
+  x: number[];
+  y: number[];
+  open: number[];
+  high: number[];
+  low: number[];
+} {
+  const x = new Array<number>(count);
+  const y = new Array<number>(count);
+  const open = new Array<number>(count);
+  const high = new Array<number>(count);
+  const low = new Array<number>(count);
+
+  let price = 50 + Math.random() * 100;
+  const drift = Math.LN2 / count;
+  const vol = 0.015;
+  let spare = 0;
+  let hasSpare = false;
+  const TWO_PI = 2 * Math.PI;
+
+  for (let i = 0; i < count; i++) {
+    x[i] = i;
+    let z: number;
+    if (hasSpare) {
+      z = spare;
+      hasSpare = false;
+    } else {
+      const u1 = Math.random() || 1e-10;
+      const r = Math.sqrt(-2 * Math.log(u1));
+      const theta = TWO_PI * Math.random();
+      z = r * Math.cos(theta);
+      spare = r * Math.sin(theta);
+      hasSpare = true;
+    }
+    const o = price;
+    const c = Math.max(0.01, price * Math.exp(drift + vol * z));
+    const range = Math.abs(c - o) * (1 + Math.random() * 1.5);
+    const h = Math.max(o, c) + Math.random() * range * 0.5;
+    const l = Math.max(0.01, Math.min(o, c) - Math.random() * range * 0.5);
+    open[i] = o;
+    high[i] = h;
+    low[i] = l;
+    y[i] = c;
+    price = c;
+  }
+  return { x, y, open, high, low };
+}
+
 async function init() {
   manager.use(LineChart);
   manager.use(AreaChart);
   manager.use(ScatterChart);
   manager.use(BarChart);
+  manager.use(CandlestickChart);
   manager.use(labelsPlugin);
   manager.use(zoomPlugin());
   manager.use(hoverPlugin);
   manager.use(legendPlugin);
+
+  setupTheme();
 
   const success = await manager.init();
   if (!success) {
@@ -292,8 +344,8 @@ async function init() {
     return;
   }
 
-  setupTheme();
   createBasicCharts();
+  createCandlestickChart();
   createSeriesCharts();
   createSpikesChart();
   createLiveCharts();
@@ -373,6 +425,28 @@ function createBasicCharts() {
         color: { r: 0.2, g: 0.7, b: 0.5 },
         x: areaData.x,
         y: areaData.y,
+      },
+    ],
+    formatX: formatIndex,
+    formatY: formatPrice,
+    showTooltip: true,
+  });
+}
+
+function createCandlestickChart() {
+  const data = generateOHLC(500);
+  manager.create({
+    type: "candlestick",
+    container: document.getElementById("basic-candlestick")!,
+    series: [
+      {
+        label: "",
+        color: { r: 0.3, g: 0.6, b: 1 },
+        x: data.x,
+        y: data.y,
+        open: data.open,
+        high: data.high,
+        low: data.low,
       },
     ],
     formatX: formatIndex,

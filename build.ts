@@ -165,6 +165,8 @@ async function buildLib() {
     path.join(SRC, "charts/area.ts"),
     path.join(SRC, "charts/scatter.ts"),
     path.join(SRC, "charts/bar.ts"),
+    path.join(SRC, "charts/candlestick.ts"),
+    path.join(SRC, "charts/boids.ts"),
   ];
 
   // Readable build (splitting enables code reuse and smaller bundles)

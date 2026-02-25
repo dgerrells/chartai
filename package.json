@@ -19,41 +19,13 @@
       "types": "./dist/gpu-worker.d.ts",
       "default": "./dist/gpu-worker.js"
     },
-    "./plugins/hover": {
-      "types": "./dist/plugins/hover.d.ts",
-      "default": "./dist/plugins/hover.js"
+    "./plugins/*": {
+      "types": "./dist/plugins/*.d.ts",
+      "default": "./dist/plugins/*.js"
     },
-    "./plugins/labels": {
-      "types": "./dist/plugins/labels.d.ts",
-      "default": "./dist/plugins/labels.js"
-    },
-    "./plugins/labels-panel": {
-      "types": "./dist/plugins/labels-panel.d.ts",
-      "default": "./dist/plugins/labels-panel.js"
-    },
-    "./plugins/legend": {
-      "types": "./dist/plugins/legend.d.ts",
-      "default": "./dist/plugins/legend.js"
-    },
-    "./plugins/zoom": {
-      "types": "./dist/plugins/zoom.d.ts",
-      "default": "./dist/plugins/zoom.js"
-    },
-    "./charts/line": {
-      "types": "./dist/charts/line.d.ts",
-      "default": "./dist/charts/line.js"
-    },
-    "./charts/area": {
-      "types": "./dist/charts/area.d.ts",
-      "default": "./dist/charts/area.js"
-    },
-    "./charts/scatter": {
-      "types": "./dist/charts/scatter.d.ts",
-      "default": "./dist/charts/scatter.js"
-    },
-    "./charts/bar": {
-      "types": "./dist/charts/bar.d.ts",
-      "default": "./dist/charts/bar.js"
+    "./charts/*": {
+      "types": "./dist/charts/*.d.ts",
+      "default": "./dist/charts/*.js"
     }
   },
   "files": [

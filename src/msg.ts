@@ -16,7 +16,6 @@ export const M = {
   GPU_READY: 12,
   ERROR: 13,
   STATS: 14,
-  BOUNDS_UPDATE: 15,
 } as const;
 
 // Short error codes posted by the worker. Look up the prefix number in docs.
