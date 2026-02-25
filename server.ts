@@ -38,12 +38,12 @@ const server = Bun.serve({
     if (requestedPath === "/") {
       requestedPath = "/pages/index.html";
     }
-    
+
     // Handle /demo route
     if (requestedPath === "/demo" || requestedPath === "/demo/") {
       requestedPath = "/pages/demo/index.html";
     }
-    
+
     // Redirect root files to pages directory
     if (requestedPath === "/main.ts") {
       requestedPath = "/pages/main.ts";
@@ -51,7 +51,7 @@ const server = Bun.serve({
     if (requestedPath === "/chart.css") {
       requestedPath = "/pages/chart.css";
     }
-    
+
     // Redirect demo files
     if (requestedPath === "/demo/main.ts") {
       requestedPath = "/pages/demo/main.ts";
@@ -66,7 +66,7 @@ const server = Bun.serve({
     if (!filePath.startsWith(PUBLIC_DIR)) {
       return new Response("Forbidden", { status: 403 });
     }
-    
+
     // If .js is requested but doesn't exist, try .ts (for bundled imports)
     if (requestedPath.endsWith(".js") && !fs.existsSync(filePath)) {
       const tsPath = filePath.replace(/\.js$/, ".ts");

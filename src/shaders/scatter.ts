@@ -1,18 +1,20 @@
 import { UNIFORM_STRUCT, COMPUTE_WG } from "./shared.ts";
 
 export const SCATTER_COMPUTE_SHADER = `${UNIFORM_STRUCT}
+struct ScatterUniforms { dispatchXCount: u32, pointSize: f32 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read> dataX: array<f32>;
 @group(0) @binding(2) var<storage, read> dataY: array<f32>;
 @group(0) @binding(3) var outputTex: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
 @group(0) @binding(5) var<uniform> seriesIdx: SeriesIndex;
+@group(0) @binding(6) var<uniform> su: ScatterUniforms;
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
 let series = allSeries[seriesIdx.index];
 let visStart = series.visibleRange.x;
 let visCount = series.visibleRange.y;
-let localIdx = id.y * u.dispatchXCount + id.x;
+let localIdx = id.y * su.dispatchXCount + id.x;
 if (localIdx >= visCount) { return; }
 let idx = visStart + localIdx;
 let count = u.pointCount;
@@ -45,7 +47,7 @@ let iHeight = i32(height);
 if (pixelX < 0 || pixelX >= iWidth) { return; }
 if (pixelY < 0 || pixelY >= iHeight) { return; }
 let color = series.color;
-let radius = i32(series.pointSize);
+let radius = i32(su.pointSize);
 for (var dy = -radius; dy <= radius; dy++) {
 for (var dx = -radius; dx <= radius; dx++) {
 if (dx * dx + dy * dy > radius * radius) { continue; }

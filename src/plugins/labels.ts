@@ -1,5 +1,25 @@
-import type { ChartPlugin, InternalChart } from "../chart-library.ts";
+import type { ChartPlugin, ChartConfig, InternalChart } from "../types.ts";
 import { ChartManager } from "../chart-library.ts";
+import { MARGIN } from "./shared.ts";
+
+export const DEFAULT_FONT =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+export const DEFAULT_LABEL_SIZE = 12;
+
+export interface LabelsConfig {
+  textColor?: string;
+  gridColor?: string;
+  fontFamily?: string;
+  labelSize?: number;
+  formatX?: (value: number) => string;
+  formatY?: (value: number) => string;
+}
+
+declare module "../types.ts" {
+  interface ChartPluginRegistry {
+    labels: LabelsConfig;
+  }
+}
 
 const niceTicks = (min: number, max: number, count: number) => {
   const range = max - min;
@@ -13,11 +33,10 @@ const niceTicks = (min: number, max: number, count: number) => {
   return ticks;
 };
 
-const getViewState = (chart: InternalChart) => {
-  const mgr = ChartManager.getInstance(),
-    w = chart.width,
+const getViewState = (chart: InternalChart<ChartConfig & LabelsConfig>) => {
+  const w = chart.width,
     h = chart.height,
-    m = ChartManager.MARGIN;
+    m = MARGIN;
   const { bounds: b, view: v } = chart,
     fullX = b.maxX - b.minX,
     fullY = b.maxY - b.minY;
@@ -26,7 +45,8 @@ const getViewState = (chart: InternalChart) => {
   const mx = b.minX + v.panX * fullX,
     my = b.minY + v.panY * fullY;
   const bgc =
-    chart.bgColor ?? (mgr.isDark ? [0.11, 0.11, 0.12] : [0.98, 0.98, 0.98]);
+    chart.config.bgColor ??
+    (ChartManager.isDark ? [0.11, 0.11, 0.12] : [0.98, 0.98, 0.98]);
   return {
     w,
     h,
@@ -36,15 +56,16 @@ const getViewState = (chart: InternalChart) => {
     mx,
     my,
     bg: `${Math.round(bgc[0] * 255)},${Math.round(bgc[1] * 255)},${Math.round(bgc[2] * 255)}`,
-    font: chart.fontFamily ?? ChartManager.DEFAULT_FONT,
-    text: chart.textColor ?? (mgr.isDark ? "#c0c0c0" : "#333333"),
+    font: chart.config.fontFamily ?? DEFAULT_FONT,
+    text:
+      chart.config.textColor ?? (ChartManager.isDark ? "#c0c0c0" : "#333333"),
     grid:
-      chart.gridColor ??
-      (mgr.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"),
+      chart.config.gridColor ??
+      (ChartManager.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"),
   };
 };
 
-export const labelsPlugin: ChartPlugin = {
+export const labelsPlugin: ChartPlugin<LabelsConfig> = {
   name: "labels",
 
   beforeDraw(ctx, chart) {
@@ -76,10 +97,9 @@ export const labelsPlugin: ChartPlugin = {
     const {
       formatX = String,
       formatY = String,
-      labelSize = ChartManager.DEFAULT_LABEL_SIZE,
+      labelSize = DEFAULT_LABEL_SIZE,
     } = chart.config;
 
-    // Compact Fade Gradients
     const drawFade = (
       dir: "left" | "bottom",
       x: number,
@@ -105,7 +125,6 @@ export const labelsPlugin: ChartPlugin = {
     ctx.font = `${labelSize}px ${font}`;
     ctx.fillStyle = text;
 
-    // Y Labels
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     niceTicks(my, my + ry, 7).forEach((v) => {
@@ -114,7 +133,6 @@ export const labelsPlugin: ChartPlugin = {
         ctx.fillText(formatY(v), m.left - 5, y);
     });
 
-    // X Labels
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
     niceTicks(mx, mx + rx, 8).forEach((v) => {

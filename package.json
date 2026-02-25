@@ -1,6 +1,6 @@
 {
   "name": "chartai",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "tiny gpu powered charts",
   "type": "module",
   "main": "./dist/chart-library.js",
@@ -11,21 +11,21 @@
       "types": "./dist/chart-library.d.ts",
       "default": "./dist/chart-library.js"
     },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
     "./worker": {
       "types": "./dist/gpu-worker.d.ts",
       "default": "./dist/gpu-worker.js"
     },
-    "./plugins/hover": {
-      "types": "./dist/plugins/hover.d.ts",
-      "default": "./dist/plugins/hover.js"
+    "./plugins/*": {
+      "types": "./dist/plugins/*.d.ts",
+      "default": "./dist/plugins/*.js"
     },
-    "./plugins/labels": {
-      "types": "./dist/plugins/labels.d.ts",
-      "default": "./dist/plugins/labels.js"
-    },
-    "./plugins/zoom": {
-      "types": "./dist/plugins/zoom.d.ts",
-      "default": "./dist/plugins/zoom.js"
+    "./charts/*": {
+      "types": "./dist/charts/*.d.ts",
+      "default": "./dist/charts/*.js"
     }
   },
   "files": [

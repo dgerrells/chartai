@@ -1,6 +1,6 @@
 # Integration Demo
 
-Comprehensive demo testing all ChartAI features using Vite.
+Comprehensive demo testing all chartai features using Vite.
 
 ## Setup
 

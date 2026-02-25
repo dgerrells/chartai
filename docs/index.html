@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChartAI - WebGPU Charting</title>
+  <title>chartai - WebGPU Charting</title>
   <link rel="stylesheet" href="./chart.css">
   <style>
     :root {
-      --accent: #1a73e8;
-      --accent-hover: #1557b0;
+      --accent: #0d9488;
+      --accent-hover: #0f766e;
+      --accent-bg: #0f766e;
+      --accent-bg-hover: #0d5c52;
       --text-secondary: #5f6368;
       --text-muted: #9aa0a6;
       --bg-tertiary: #f1f3f4;
@@ -18,8 +20,10 @@
     }
 
     .dark {
-      --accent: #8ab4f8;
-      --accent-hover: #aecbfa;
+      --accent: #2dd4bf;
+      --accent-hover: #5eead4;
+      --accent-bg: #14b8a6;
+      --accent-bg-hover: #2dd4bf;
       --text-secondary: #9aa0a6;
       --text-muted: #5f6368;
       --bg-tertiary: #2d2d2d;
@@ -38,111 +42,118 @@
     .landing {
       max-width: 1600px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 24px 20px 48px;
     }
 
     .landing-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 32px;
-      padding: 20px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
+      margin-bottom: 40px;
+      padding: 0 0 20px;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .landing-title {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
+      letter-spacing: -0.5px;
     }
 
     .landing-subtitle {
-      font-size: 16px;
+      font-size: 15px;
       color: var(--text-secondary);
     }
 
     .demo-link {
-      padding: 10px 20px;
-      background: var(--accent);
-      color: white;
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      color: var(--accent);
       text-decoration: none;
+      border: 1px solid var(--border-color);
       border-radius: var(--radius-sm);
       font-weight: 600;
-      font-size: 14px;
-      transition: background 0.15s;
+      font-size: 13px;
+      transition: border-color 0.15s, color 0.15s;
     }
 
     .demo-link:hover {
-      background: var(--accent-hover);
+      border-color: var(--accent);
+    }
+
+    .landing-section-heading {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 48px 0 16px;
+      color: var(--text-secondary);
+      letter-spacing: 0.3px;
+    }
+
+    .landing-section-heading:first-of-type {
+      margin-top: 0;
     }
 
     .section {
-      margin-bottom: 32px;
-      padding: 24px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-md);
+      margin-bottom: 40px;
+      padding: 0;
     }
 
     .section-title {
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 600;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
       display: flex;
       align-items: center;
       gap: 12px;
     }
 
     .section-description {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-secondary);
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .chart-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-      gap: 16px;
-      min-height: 380px;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+      min-height: 360px;
     }
 
     .chart-wrapper {
       display: flex;
       flex-direction: column;
-      background: var(--bg-tertiary);
+      background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       overflow: hidden;
-      min-height: 380px;
+      min-height: 360px;
       height: 100%;
     }
 
     .chart-header {
-      padding: 12px 16px;
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border-color);
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .chart-label {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--text-primary);
     }
 
     .chart-info {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
     }
 
     .chart-body {
       flex: 1;
-      min-height: 320px;
+      min-height: 300px;
       position: relative;
     }
 
@@ -175,18 +186,19 @@
     .control-item button {
       height: 32px;
       padding: 0 16px;
-      background: var(--accent);
-      color: white;
-      border: none;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
       border-radius: var(--radius-sm);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: border-color 0.15s, background 0.15s;
     }
 
     .control-item button:hover {
-      background: var(--accent-hover);
+      border-color: var(--accent);
+      background: var(--bg-tertiary);
     }
 
     .control-item button:disabled {
@@ -201,7 +213,7 @@
 
     .speed-btn {
       padding: 6px 12px;
-      background: var(--bg-tertiary);
+      background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-sm);
       font-size: 12px;
@@ -212,13 +224,14 @@
     }
 
     .speed-btn:hover {
-      background: var(--bg-secondary);
+      border-color: var(--accent);
+      color: var(--text-primary);
     }
 
     .speed-btn.active {
-      background: var(--accent);
-      color: white;
       border-color: var(--accent);
+      color: var(--accent);
+      background: var(--bg-secondary);
     }
 
     .stats-display {
@@ -245,10 +258,11 @@
     .toggle-slider {
       width: 44px;
       height: 24px;
-      background: var(--bg-tertiary);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       position: relative;
-      transition: background 0.2s;
+      transition: background 0.2s, border-color 0.2s;
     }
 
     .toggle-slider::after {
@@ -265,7 +279,8 @@
     }
 
     .toggle input:checked + .toggle-slider {
-      background: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary));
+      border: 1px solid var(--accent);
     }
 
     .toggle input:checked + .toggle-slider::after {
@@ -278,9 +293,27 @@
       color: var(--text-secondary);
     }
 
+    .chart-row-compact {
+      min-height: 260px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .chart-row-compact .chart-wrapper {
+      min-height: 260px;
+    }
+
+    .chart-row-compact .chart-body {
+      min-height: 220px;
+    }
+
+    .chart-wrapper.full-width {
+      grid-column: 1 / -1;
+    }
+
     @media (max-width: 768px) {
       .chart-row {
         grid-template-columns: 1fr;
+        gap: 16px;
       }
     }
   </style>
@@ -289,11 +322,11 @@
   <div class="landing">
     <div class="landing-header">
       <div>
-        <h1 class="landing-title">ChartAI</h1>
+        <h1 class="landing-title">chartai</h1>
         <p class="landing-subtitle">tiny package big performance</p>
       </div>
       <div style="display: flex; gap: 12px; align-items: center;">
-        <a href="./demo/" class="demo-link">Full Demo →</a>
+        <a href="./demo/" class="demo-link">Playground</a>
         <button class="theme-btn" id="theme-btn" title="Toggle theme">
           <svg id="theme-icon-sun" class="theme-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"/>
@@ -313,10 +346,12 @@
       </div>
     </div>
 
-    <!-- Basic -->
+    <h2 class="landing-section-heading">Charts</h2>
+
+    <!-- Base -->
     <div class="section">
-      <h2 class="section-title">Basic Charts</h2>
-      <p class="section-description">Three fundamental chart types with different data sizes</p>
+      <h2 class="section-title">Base</h2>
+      <p class="section-description">All chart types in simple form</p>
       <div class="chart-row" id="basic-charts">
         <div class="chart-wrapper">
           <div class="chart-header">
@@ -338,6 +373,20 @@
             <span class="chart-info">5,000 points</span>
           </div>
           <div class="chart-body" id="basic-scatter"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header">
+            <span class="chart-label">Area Chart</span>
+            <span class="chart-info">1,000 points</span>
+          </div>
+          <div class="chart-body" id="basic-area"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header">
+            <span class="chart-label">Candlestick</span>
+            <span class="chart-info">500 OHLC</span>
+          </div>
+          <div class="chart-body" id="basic-candlestick"></div>
         </div>
       </div>
     </div>
@@ -368,6 +417,13 @@
           </div>
           <div class="chart-body" id="series-scatter"></div>
         </div>
+        <div class="chart-wrapper">
+          <div class="chart-header">
+            <span class="chart-label">Area Chart</span>
+            <span class="chart-info">1,000 points × 3 series</span>
+          </div>
+          <div class="chart-body" id="series-area"></div>
+        </div>
       </div>
     </div>
 
@@ -376,7 +432,7 @@
       <h2 class="section-title">Data Spikes</h2>
       <p class="section-description">High-frequency data with extreme volatility</p>
       <div class="chart-row">
-        <div class="chart-wrapper" style="grid-column: 1 / -1;">
+        <div class="chart-wrapper full-width">
           <div class="chart-header">
             <span class="chart-label">Spiky Line Chart</span>
             <span class="chart-info">100,000 points</span>
@@ -485,12 +541,98 @@
         <div class="stats-display" id="bigseries-stats">Ready</div>
       </div>
       <div class="chart-row">
-        <div class="chart-wrapper" style="grid-column: 1 / -1;">
+        <div class="chart-wrapper full-width">
           <div class="chart-header">
             <span class="chart-label">Massive Multi-Series Line</span>
             <span class="chart-info" id="bigseries-info">Not generated</span>
           </div>
           <div class="chart-body" id="bigseries-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="landing-section-heading">Plugins</h2>
+
+    <!-- Legend -->
+    <div class="section">
+      <h2 class="section-title">Legend</h2>
+      <p class="section-description">defaultOpen, alwaysOpen, maxLabelChars</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Default</span><span class="chart-info">legend: {}</span></div>
+          <div class="chart-body" id="legend-default"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">defaultOpen</span><span class="chart-info">Starts open</span></div>
+          <div class="chart-body" id="legend-default-open"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">alwaysOpen</span><span class="chart-info">No close</span></div>
+          <div class="chart-body" id="legend-always-open"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">12 series</span><span class="chart-info">Scroll</span></div>
+          <div class="chart-body" id="legend-many-series"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Labels -->
+    <div class="section">
+      <h2 class="section-title">Labels</h2>
+      <p class="section-description">textColor, labelSize, gridColor</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Default</span></div>
+          <div class="chart-body" id="labels-default"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">labelSize: 10</span></div>
+          <div class="chart-body" id="labels-small"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">gridColor: accent</span></div>
+          <div class="chart-body" id="labels-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zoom -->
+    <div class="section">
+      <h2 class="section-title">Zoom</h2>
+      <p class="section-description">zoomMode: both | x-only | y-only | none</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">both</span><span class="chart-info">Pan & zoom</span></div>
+          <div class="chart-body" id="zoom-both"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">x-only</span><span class="chart-info">Horizontal</span></div>
+          <div class="chart-body" id="zoom-x"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">y-only</span><span class="chart-info">Vertical</span></div>
+          <div class="chart-body" id="zoom-y"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">none</span><span class="chart-info">Disabled</span></div>
+          <div class="chart-body" id="zoom-none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hover -->
+    <div class="section">
+      <h2 class="section-title">Hover</h2>
+      <p class="section-description">showTooltip, formatX, formatY, pillDecayMs</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">showTooltip: true</span></div>
+          <div class="chart-body" id="hover-tooltip"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">showTooltip: false</span></div>
+          <div class="chart-body" id="hover-no-tooltip"></div>
         </div>
       </div>
     </div>

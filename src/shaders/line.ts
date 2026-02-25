@@ -1,6 +1,7 @@
 import { UNIFORM_STRUCT, BINARY_SEARCH, COMPUTE_WG } from "./shared.ts";
 
 export const LINE_COMPUTE_SHADER = `${UNIFORM_STRUCT}
+struct LineUniforms { maxSamplesPerPixel: u32, _p1: u32, _p2: u32, _p3: u32 };
 struct LineData {
 screenX: f32,
 minScreenY: f32,
@@ -12,6 +13,7 @@ valid: f32,
 @group(0) @binding(2) var<storage, read> dataY: array<f32>;
 @group(0) @binding(3) var<storage, read_write> lineData: array<LineData>;
 @group(0) @binding(4) var<storage, read> allSeries: array<SeriesInfo>;
+@group(0) @binding(5) var<uniform> lu: LineUniforms;
 ${BINARY_SEARCH}
 @compute @workgroup_size(${COMPUTE_WG})
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -33,6 +35,10 @@ return;
 let relPx = f32(outputIdx);
 let pixelMinX = u.viewMinX + (relPx / u.width) * viewRangeX;
 let pixelMaxX = u.viewMinX + ((relPx + 1.0) / u.width) * viewRangeX;
+if (pixelMaxX < u.dataMinX || pixelMinX > u.dataMaxX) {
+lineData[outputIdx] = LineData(-1.0, -1.0, -1.0, 0.0);
+return;
+}
 let startIdx = lowerBound(pixelMinX, count);
 var endIdx = lowerBound(pixelMaxX, count);
 endIdx = min(endIdx, count);
@@ -63,7 +69,7 @@ return;
 var dataMinY = dataY[startIdx];
 var dataMaxY = dataY[startIdx];
 let rangeCount = endIdx - startIdx;
-let maxSamples = u.maxSamplesPerPixel;
+let maxSamples = lu.maxSamplesPerPixel;
 if (maxSamples > 1u && rangeCount > maxSamples) {
 let stride = f32(rangeCount - 1u) / f32(maxSamples - 1u);
 for (var s = 0u; s < maxSamples; s++) {

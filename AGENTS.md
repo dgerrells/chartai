@@ -1,376 +1,274 @@
-# AGENTS.md - ChartAI Library Guide for AI Agents
+# chartai — Agent Reference
 
-This document provides guidance for AI agents working with the ChartAI library.
+Guide for LLM agents working with the chartai charting library.
 
 ## Overview
 
-ChartAI is a GPU-accelerated WebGPU chart library (~11kb) that renders millions of data points at 60fps using compute shaders. It supports line, scatter, and bar charts with passive rendering and automatic virtualization.
+chartai is a GPU-accelerated charting library that renders via WebGPU compute and render pipelines in a web worker. The main thread stays free; charts update passively when needed.
 
-**Critical Requirements:**
-- WebGPU support is mandatory (no fallback)
-- Uses Web Workers for off-thread GPU computation
-- Color values use 0-1 range (not 0-255)
+**Architecture:**
+- **Main thread:** ChartManager singleton, Chart instances, DOM/canvas setup, plugin UI
+- **Web worker:** GPU worker (`gpu-worker.ts`) runs compute shaders and render passes
+- **Triple canvas:** back (2D, behind chart), GPU (OffscreenCanvas), front (2D, overlays)
+- **Plugins:** Two kinds — **RendererPlugin** (GPU chart types) and **ChartPlugin** (UI: zoom, hover, labels)
 
-## Core API Pattern
+**Requirements:** WebGPU with compute shader support. No fallback.
 
-```js
+---
+
+## Core API
+
+### ChartManager (singleton)
+
+```ts
 import { ChartManager } from 'chartai';
-
-// 1. Get singleton instance
-const manager = ChartManager.getInstance();
-
-// 2. Initialize (async, call once)
-await manager.init();
-
-// 3. Create chart (returns chartId string)
-const chartId = manager.create({
-  type: 'line',              // 'line' | 'scatter' | 'bar'
-  container: htmlElement,    // Must be a valid HTMLElement
-  series: [/* array of series */]
-});
-
-// 4. Update/destroy as needed
-manager.update(chartId, { /* new series */ });
-manager.destroy(chartId);
 ```
 
-## Data Format
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `use` | `(plugin: RendererPlugin \| ChartPlugin) => void` | Register a chart type or UI plugin. Call before `init()`. |
+| `init` | `() => Promise<boolean>` | Start GPU worker. Returns `true` if WebGPU is available. |
+| `create` | `(config: ChartConfig & ...) => Chart` | Create a chart. Requires `init()` first and a matching renderer via `use()`. |
+| `setTheme` | `(dark: boolean) => void` | Toggle dark mode. |
+| `setSyncViews` | `(sync: boolean) => void` | Sync pan/zoom across all charts. |
+| `onStats` | `(cb: (stats: ChartStats) => void) => () => void` | Subscribe to FPS/render stats. Returns unsubscribe. |
+| `getStats` | `() => ChartStats` | Current stats snapshot. |
 
-### Series Structure
-```js
-{
-  label: 'Series Name',
-  color: { r: 0.4, g: 0.6, b: 1.0 },  // RGB in 0-1 range, NOT 0-255
-  x: [1, 2, 3, 4],                     // Must be sorted ascending
-  y: [10, 20, 15, 25]                  // Same length as x
+### Chart (instance)
+
+Returned by `ChartManager.create()`.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `id` | `string` | Chart ID (readonly). |
+| `setData` | `(series: ChartSeries[]) => void` | Replace all series data. |
+| `configure` | `(patch: Partial<Config>) => void` | Update config, uniforms, bgColor. Triggers render. |
+| `addPlugin` | `(plugin: ChartPlugin) => void` | Add UI plugin to this chart only. |
+| `removePlugin` | `(name: string) => void` | Remove plugin by name. |
+| `hasPlugin` | `(name: string) => boolean` | Check if plugin is installed. |
+| `resetView` | `() => void` | Animate back to default pan/zoom. |
+| `destroy` | `() => void` | Remove chart and cleanup. |
+
+---
+
+## API with Defaults
+
+### ChartConfig (base, required)
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `type` | `string` | yes | — |
+| `container` | `HTMLElement` | yes | — |
+| `series` | `ChartSeries[]` | yes | — |
+| `defaultBounds` | `{ minX?, maxX?, minY?, maxY? }` | no | auto from data |
+| `bgColor` | `[r, g, b]` 0–1 | no | theme-based |
+
+### ChartSeries
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `label` | `string` | yes | — |
+| `color` | `ChartColor \| string` | yes | `{ r, g, b }` 0–1 or any CSS color (hex, rgb, oklab, etc.) |
+| `x` | `number[]` | yes | Sorted by X before upload |
+| `y` | `number[]` | yes | Same length as `x` |
+| `[key]` | `number[]` | no | Extra per-point data; use in shaders via `{key}-data` binding |
+
+### Built-in chart types and their config
+
+| Type | Config | Defaults |
+|------|--------|----------|
+| `line` | `LineConfig` | `maxSamplesPerPixel: 10000` |
+| `area` | same as line | same |
+| `scatter` | `ScatterConfig` | `pointSize: 3` |
+| `bar` | `BarConfig` | `maxSamplesPerPixel: 10000` |
+| `candlestick` | `CandlestickConfig` | `maxSamples: 10000`, `binSize: 8`, `interval: 0`, `upColor`, `downColor` |
+| `boids` | `BoidsConfig` | `radius: 6` |
+
+### Plugin options (merged into create config)
+
+| Plugin | Config | Defaults |
+|--------|--------|----------|
+| zoom | `zoomMode?: ZoomMode` | `"both"` |
+| hover | `showTooltip?: boolean`, `onHover?: (HoverData \| null) => void`, `pillDecayMs?: number`, `formatX?`, `formatY?`, `fontFamily?` | `showTooltip: false`, `pillDecayMs: 60` |
+| labels | `textColor?`, `gridColor?`, `fontFamily?`, `labelSize?`, `formatX?`, `formatY?` | theme-based colors, `formatX/Y: String` |
+
+`ZoomMode`: `"both"` | `"x-only"` | `"y-only"` | `"none"`
+
+---
+
+## Custom Charts (RendererPlugin)
+
+A custom chart is a `RendererPlugin` with WGSL shaders. Register with `ChartManager.use(MyChart)` before `create()`.
+
+### RendererPlugin
+
+```ts
+interface RendererPlugin {
+  name: string;                    // Used as config.type
+  shaders: Record<string, string>; // Named WGSL entry points
+  passes: PassDef[];
+  buffers?: BufferDef[];
+  uniforms?: UniformDef[];
+  computeBounds?: (series) => { minX, maxX, minY, maxY };
+  install?: (chart, el) => void;
+  uninstall?: (chart) => void;
 }
 ```
 
-**Common Mistakes:**
-- ❌ `color: { r: 100, g: 150, b: 255 }` (0-255 range)
-- ✅ `color: { r: 0.4, g: 0.6, b: 1.0 }` (0-1 range)
-- ❌ Unsorted x values
-- ✅ X values must be sorted in ascending order
+### PassDef
 
-## Plugin System
-
-Plugins extend functionality. Register before creating charts:
-
-```js
-import { registerPlugin } from 'chartai';
-import { zoomPlugin } from 'chartai/plugins/zoom';
-import { hoverPlugin } from 'chartai/plugins/hover';
-import { labelsPlugin } from 'chartai/plugins/labels';
-
-// Register once, applies to all charts
-registerPlugin(zoomPlugin());  // Note: zoomPlugin is a factory function
-registerPlugin(hoverPlugin);   // hoverPlugin is the plugin itself
-registerPlugin(labelsPlugin);
-```
-
-**Available Plugins:**
-- `zoomPlugin()` - Mouse wheel zoom, pan with drag
-- `hoverPlugin` - Crosshair and hover detection
-- `labelsPlugin` - Axis labels and grid lines
-
-**Plugin Options:**
-```js
-registerPlugin(zoomPlugin({
-  wheelSensitivity: 1.2,  // Default: 1.1
-  maxZoom: 1000,          // Default: 100
-  minZoom: 0.1            // Default: 0.1
-}));
-```
-
-## Configuration Options
-
-### Essential Options
-```js
-{
-  type: 'line',                    // Required: 'line' | 'scatter' | 'bar'
-  container: document.getElementById('chart'),  // Required: HTMLElement
-  series: [/* ... */],             // Required: Array of ChartSeries
-  zoomMode: 'both',                // 'both' | 'x-only' | 'y-only' | 'none'
-  pointSize: 4,                    // Point radius in pixels (scatter/line)
-  showTooltip: false,              // Enable built-in hover tooltip
+```ts
+interface PassDef {
+  type: "compute" | "render";
+  shader: string;           // Key in shaders map
+  bindings: BindingDef[];
+  perSeries?: boolean;      // Default true for compute
+  dispatch?: (ctx: RenderContext) => { x, y?, z? };  // Compute only
+  topology?: string;        // Render: "triangle-list" | "line-list" | etc.
+  loadOp?: "clear" | "load";
+  blend?: BlendState;
+  draw?: (ctx: RenderContext) => number;  // Render: vertex count
 }
 ```
 
-### Performance Options
-```js
-{
-  maxSamplesPerPixel: 1000,  // Max data points per pixel column
-                              // Higher = more accurate but slower
-                              // 0 = unlimited (use for < 10k points)
+### BindingDef
+
+```ts
+interface BindingDef {
+  binding: number;
+  source: string;   // Built-in or buffer name
+  write?: boolean;  // For storage buffers
 }
 ```
 
-### Styling Options
-```js
-{
-  bgColor: [0.1, 0.1, 0.15],      // RGB 0-1 range, default from theme
-  textColor: '#e0e0e0',           // CSS color for labels
-  gridColor: 'rgba(255,255,255,0.1)',  // CSS color for grid
-  fontFamily: 'monospace',        // Font for axis labels
-  labelSize: 12,                  // Font size for labels
+### Built-in binding sources
+
+| Source | Description |
+|--------|-------------|
+| `uniforms` | View + theme uniforms (width, height, viewMinX/Y, viewMaxX/Y, bounds, isDark, bgColor, etc.) |
+| `custom-uniforms` | Renderer uniforms (from config / `chart.configure()`) |
+| `series-info` | Per-series color + visible range (SeriesInfo struct) |
+| `series-index` | Current series index (perSeries passes) |
+| `x-data` | Float32Array of X values |
+| `y-data` | Float32Array of Y values |
+| `{key}-data` | Extra series data: `series.extra[key]` → e.g. `open-data`, `high-data`, `low-data` |
+| `render-target` | Output texture (compute, write-only) |
+| `{bufferName}` | Custom buffer from `buffers` |
+
+### BufferDef
+
+```ts
+interface BufferDef {
+  name: string;
+  bytes: (ctx: RenderContext) => number;
+  usages: BufferUsage[];  // e.g. ["STORAGE"]
 }
 ```
 
-### Bounds Control
-```js
-{
-  defaultBounds: {
-    minX: 0,
-    maxX: 100,
-    minY: -50,
-    maxY: 50
-  }
+If a pass uses a buffer and `perSeries` is true, the worker creates one buffer per series. Otherwise one per chart.
+
+### UniformDef
+
+```ts
+interface UniformDef {
+  name: string;
+  type: "f32" | "u32";
+  default: number;
 }
 ```
 
-### Custom Formatters
-```js
-{
-  formatX: (value) => new Date(value).toLocaleTimeString(),
-  formatY: (value) => `$${value.toFixed(2)}`
+Values come from `create()` config and `chart.configure()`. Use `custom-uniforms` binding in shaders.
+
+### RenderContext (for dispatch, draw, bytes)
+
+```ts
+interface RenderContext {
+  width: number;   // Physical pixels
+  height: number;
+  samples: number; // Points in current series
+  seriesCount: number;
+  bounds: { minX, maxX, minY, maxY };
+  view: { panX, panY, zoomX, zoomY };
 }
 ```
 
-## Common Patterns
+### Shader conventions
 
-### React Integration
-```js
-function Chart() {
-  const containerRef = useRef(null);
-  const chartIdRef = useRef(null);
-  
-  useEffect(() => {
-    const manager = ChartManager.getInstance();
-    
-    manager.init().then(() => {
-      chartIdRef.current = manager.create({
-        type: 'line',
-        container: containerRef.current,
-        series: [/* data */]
-      });
-    });
-    
-    return () => {
-      if (chartIdRef.current) {
-        manager.destroy(chartIdRef.current);
-      }
-    };
-  }, []);
-  
-  return <div ref={containerRef} style={{ width: '100%', height: '400px' }} />;
-}
-```
+- Include shared structs from `shaders/shared.ts`: `UNIFORM_STRUCT`, `BINARY_SEARCH`, `COMPUTE_WG`
+- Compute: `@compute @workgroup_size(COMPUTE_WG)` or similar
+- Render: `@vertex` and `@fragment` entry points
+- Bindings use `@group(0) @binding(N)` — group is always 0
+- `uniforms` layout: `Uniforms`, `SeriesInfo`, `SeriesIndex` as documented in shared.ts
 
-### Dynamic Updates
-```js
-// Update series data (full reupload)
-manager.update(chartId, {
-  series: newSeriesArray
-});
+### Example: minimal custom renderer
 
-// Change zoom mode
-manager.setZoomMode(chartId, 'x-only');
+```ts
+import type { RendererPlugin } from "chartai/types";
 
-// Get chart stats
-const stats = manager.getStats();  // { fps, renderMs, total, active }
-```
+const MY_SHADER = `/* WGSL */`;
 
-### Hover Interaction
-```js
-const chartId = manager.create({
-  type: 'line',
-  container: element,
-  series: data,
-  onHover: (hoverData) => {
-    if (hoverData) {
-      console.log(`Point: ${hoverData.x}, ${hoverData.y}`);
-      console.log(`Series: ${hoverData.seriesLabel}`);
-      console.log(`Index: ${hoverData.index}`);
-    }
-  }
-});
-```
-
-### Multi-Chart Synchronization
-Charts automatically sync when using zoom/pan plugins. To manually sync:
-
-```js
-// All charts share the same ChartManager singleton
-// Zoom/pan on one chart affects all charts with matching bounds
-const chart1 = manager.create({ /* config */ });
-const chart2 = manager.create({ /* config */ });
-// Both will synchronize automatically
-```
-
-## Gotchas and Limitations
-
-### Data Updates
-- **Full reupload on every update** - No incremental append
-- For small datasets (< 100k points), this is still fast
-- For streaming data, consider batching updates
-
-### WebGPU Requirement
-- **No fallback rendering** - Browser must support WebGPU
-- Check compatibility: `if (!navigator.gpu) { /* show error */ }`
-- Supported: Chrome 113+, Edge 113+, Safari 18+
-
-### Performance Considerations
-- Data scale limited by VRAM (M1 can handle millions before RAM exhaustion)
-- Multiple charts (20+) share GPU workload efficiently
-- Decimation used for large datasets (controlled by `maxSamplesPerPixel`)
-
-### Styling Quirks
-- Uses 3 layered canvases (back, main, axis)
-- Color format is 0-1 range, not 0-255
-- Container must have explicit dimensions (width/height in CSS)
-
-### Bar Charts
-- Bar rendering style is opinionated
-- To customize, copy/modify the shader in `src/gpu-worker.ts`
-
-### Data Format
-- X values must be sorted in ascending order
-- X and Y arrays must be same length
-- No data validation - invalid data causes GPU errors
-
-## Debugging
-
-### Common Errors
-
-**"Container not found"**
-- Ensure element exists before calling `manager.create()`
-- Check that container has non-zero dimensions
-
-**"WebGPU not supported"**
-- Browser doesn't support WebGPU
-- Check `navigator.gpu` availability
-
-**"Invalid color values"**
-- Colors must be 0-1 range, not 0-255
-- Convert: `r/255, g/255, b/255`
-
-**Charts not visible**
-- Container needs explicit CSS dimensions
-- Check `z-index` if overlapping elements
-
-**Poor performance**
-- Reduce `maxSamplesPerPixel` for huge datasets
-- Check GPU memory usage
-- Destroy unused charts
-
-### Performance Monitoring
-```js
-const stats = manager.getStats();
-console.log(`FPS: ${stats.fps}`);
-console.log(`Render time: ${stats.renderMs}ms`);
-console.log(`Active charts: ${stats.active}/${stats.total}`);
-```
-
-## File Structure
-
-When helping users set up ChartAI:
-
-```
-your-project/
-├── node_modules/chartai/
-│   ├── dist/
-│   │   ├── chart-library.js      # Main library
-│   │   └── chart-library.min.js  # Minified
-│   └── plugins/
-│       ├── zoom.js
-│       ├── hover.js
-│       └── labels.js
-```
-
-## Import Patterns
-
-### ES Modules (recommended)
-```js
-import { ChartManager, registerPlugin } from 'chartai';
-import { zoomPlugin } from 'chartai/plugins/zoom';
-```
-
-### Browser (script tag)
-```html
-<script type="module">
-  import { ChartManager } from './node_modules/chartai/dist/chart-library.js';
-</script>
-```
-
-## Best Practices for Agent Implementation
-
-1. **Always check WebGPU support** before using ChartAI
-2. **Convert colors to 0-1 range** if user provides 0-255
-3. **Sort X values** if they're not already sorted
-4. **Set explicit container dimensions** in CSS
-5. **Call init() once** per application lifecycle
-6. **Destroy charts** when components unmount (React/Vue)
-7. **Register plugins before creating charts**
-8. **Use TypeScript types** if available for better integration
-
-## Example: Complete Setup
-
-```js
-import { ChartManager, registerPlugin } from 'chartai';
-import { zoomPlugin } from 'chartai/plugins/zoom';
-import { hoverPlugin } from 'chartai/plugins/hover';
-import { labelsPlugin } from 'chartai/plugins/labels';
-
-// Check WebGPU support
-if (!navigator.gpu) {
-  console.error('WebGPU not supported');
-  // Show error to user
-  return;
-}
-
-// Register plugins once
-registerPlugin(labelsPlugin);
-registerPlugin(zoomPlugin({ wheelSensitivity: 1.15 }));
-registerPlugin(hoverPlugin);
-
-// Initialize manager
-const manager = ChartManager.getInstance();
-await manager.init();
-
-// Prepare data (ensure x is sorted)
-const x = Array.from({ length: 1000 }, (_, i) => i);
-const y = x.map(v => Math.sin(v * 0.05) * 50 + 50);
-
-// Create chart
-const chartId = manager.create({
-  type: 'line',
-  container: document.getElementById('chart-container'),
-  series: [{
-    label: 'Sine Wave',
-    color: { r: 0.2, g: 0.6, b: 1.0 },  // Nice blue
-    x,
-    y
+export const MyChart: RendererPlugin = {
+  name: "my-chart",
+  shaders: { main: MY_SHADER },
+  uniforms: [{ name: "pointSize", type: "f32", default: 4 }],
+  buffers: [{
+    name: "outBuffer",
+    bytes: ({ width }) => width * 16,
+    usages: ["STORAGE"],
   }],
-  zoomMode: 'both',
-  showTooltip: true,
-  formatX: (v) => v.toFixed(0),
-  formatY: (v) => v.toFixed(2)
-});
-
-// Later: update data
-manager.update(chartId, {
-  series: [{ label: 'New Data', color: { r: 1, g: 0.5, b: 0 }, x: newX, y: newY }]
-});
-
-// Cleanup
-manager.destroy(chartId);
+  passes: [{
+    type: "compute",
+    shader: "main",
+    perSeries: true,
+    dispatch: ({ samples }) => ({ x: Math.ceil(samples / 256) }),
+    bindings: [
+      { binding: 0, source: "uniforms" },
+      { binding: 1, source: "x-data" },
+      { binding: 2, source: "y-data" },
+      { binding: 3, source: "outBuffer", write: true },
+      { binding: 4, source: "series-info" },
+      { binding: 5, source: "custom-uniforms" },
+    ],
+  }],
+};
 ```
 
-## Philosophy
+---
 
-ChartAI prioritizes:
-- **Performance over features** - GPU acceleration for massive datasets
-- **Simplicity over flexibility** - Opinionated defaults, small API surface
-- **DIY customization** - Small codebase meant to be forked/modified
+## Custom Plugins (ChartPlugin)
 
-The library is intentionally minimal (~11kb). For custom behaviors, users are encouraged to copy and modify the source rather than requesting features.
+UI plugins draw on the back/front canvases and attach event handlers.
+
+```ts
+interface ChartPlugin<C = object> {
+  name: string;
+  install?: (chart: InternalChart, el: HTMLElement) => void;
+  uninstall?: (chart: InternalChart) => void;
+  resetView?: (chart: InternalChart) => void;
+  beforeDraw?: (ctx: CanvasRenderingContext2D, chart: InternalChart) => void;
+  afterDraw?: (ctx: CanvasRenderingContext2D, chart: InternalChart) => void;
+}
+```
+
+- `beforeDraw`: runs on back canvas, behind GPU chart
+- `afterDraw`: runs on front canvas, on top
+- Use `chart.config` for plugin options; extend `ChartPluginRegistry` in types for typing
+- Use `ChartManager.drawChart(chart)` to request a redraw after state changes
+
+---
+
+## Package exports
+
+| Export | Contents |
+|--------|----------|
+| `chartai` | ChartManager, Chart, types |
+| `chartai/types` | ChartSeries, ChartConfig, RendererPlugin, ChartPlugin, etc. |
+| `chartai/charts/line` | LineChart |
+| `chartai/charts/area` | AreaChart |
+| `chartai/charts/scatter` | ScatterChart |
+| `chartai/charts/bar` | BarChart |
+| `chartai/charts/candlestick` | CandlestickChart |
+| `chartai/plugins/zoom` | zoomPlugin() |
+| `chartai/plugins/hover` | hoverPlugin |
+| `chartai/plugins/labels` | labelsPlugin |
+| `chartai/plugins/legend` | legendPlugin |

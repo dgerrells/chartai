@@ -1,18 +1,16 @@
-// Chartai Canvas Demo — Infinite canvas with draggable, resizable chart tiles
+// chartai Canvas Demo — Infinite canvas with draggable, resizable chart tiles
 
-import { ChartManager, registerPlugin } from "/src/chart-library.ts";
-import type {
-  ChartType,
-  ChartConfig,
-  ChartSeries,
-} from "/src/chart-library.ts";
+import { ChartManager as manager, Chart } from "/src/chart-library.ts";
+import type { ChartConfig, ChartSeries } from "/src/types.ts";
 import { labelsPlugin } from "/src/plugins/labels.ts";
 import { zoomPlugin } from "/src/plugins/zoom.ts";
 import { hoverPlugin } from "/src/plugins/hover.ts";
+import { LineChart } from "/src/charts/line.ts";
+import { AreaChart } from "/src/charts/area.ts";
+import { ScatterChart } from "/src/charts/scatter.ts";
+import { BarChart } from "/src/charts/bar.ts";
 
-registerPlugin(labelsPlugin);
-registerPlugin(zoomPlugin());
-registerPlugin(hoverPlugin);
+type ChartType = "line" | "area" | "scatter" | "bar";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -25,7 +23,7 @@ interface Rect {
 
 interface CanvasChart {
   id: string;
-  chartId: string;
+  chart: Chart | null;
   name: string;
   x: number;
   y: number;
@@ -700,7 +698,7 @@ return { x, y };`,
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-let manager: ChartManager;
+// manager is the imported singleton
 const charts: CanvasChart[] = [];
 let nextId = 1;
 
@@ -1134,7 +1132,7 @@ function addChartAt(type: ChartType, cx: number, cy: number) {
 
   const chart: CanvasChart = {
     id,
-    chartId: "",
+    chart: null,
     name: "Chart " + (nextId - 1),
     x,
     y,
@@ -1188,7 +1186,7 @@ function addChartAt(type: ChartType, cx: number, cy: number) {
   };
 
   try {
-    chart.chartId = manager.create(config);
+    chart.chart = manager.create(config);
   } catch (err) {
     console.error("Failed to create chart:", err);
     el.remove();
@@ -1208,7 +1206,7 @@ function removeChart(id: string) {
   const idx = charts.findIndex((c) => c.id === id);
   if (idx < 0) return;
   const chart = charts[idx];
-  if (chart.chartId) manager.destroy(chart.chartId);
+  chart.chart?.destroy();
   chart.el.remove();
   charts.splice(idx, 1);
 }
@@ -1307,7 +1305,7 @@ function createTileElement(chart: CanvasChart): HTMLElement {
     pointSlider.addEventListener("input", () => {
       const size = parseInt(pointSlider.value);
       pointLabel.textContent = size + "px";
-      if (chart.chartId) manager.setPointSize(chart.chartId, size);
+      chart.chart?.configure({ pointSize: size });
     });
     pointSlider.addEventListener("mousedown", (e) => e.stopPropagation());
   }
@@ -1374,7 +1372,7 @@ function createTileElement(chart: CanvasChart): HTMLElement {
     const action = btn.dataset.action;
     if (action === "close") removeChart(chart.id);
     if (action === "data") showDataDialog(chart);
-    if (action === "reset" && chart.chartId) manager.resetView(chart.chartId);
+    if (action === "reset") chart.chart?.resetView();
   });
 
   return el;
@@ -1476,7 +1474,7 @@ async function loadPresetIntoChart(chart: CanvasChart, preset: DataPreset) {
     const result = fn(data, preset.url);
     if (!result || !Array.isArray(result.x) || !Array.isArray(result.y)) return;
     if (result.x.length === 0) return;
-    manager.updateSeries(chart.chartId, [
+    chart.chart?.setData([
       {
         label: preset.name,
         color: randomColor(),
@@ -1484,7 +1482,7 @@ async function loadPresetIntoChart(chart: CanvasChart, preset: DataPreset) {
         y: result.y,
       },
     ]);
-    manager.resetView(chart.chartId);
+    chart.chart?.resetView();
     updateTilePoints(chart, result.x.length);
     chart.name = preset.name;
     const nameInput = chart.el.querySelector(".tile-name") as HTMLInputElement;
@@ -1550,7 +1548,7 @@ async function loadDataSource() {
     }
 
     // Update chart data
-    manager.updateSeries(chart.chartId, [
+    chart.chart?.setData([
       {
         label: chart.name,
         color: randomColor(),
@@ -1558,7 +1556,7 @@ async function loadDataSource() {
         y: result.y,
       },
     ]);
-    manager.resetView(chart.chartId);
+    chart.chart?.resetView();
 
     // Update point count badge
     updateTilePoints(chart, result.x.length);
@@ -1662,7 +1660,7 @@ function setupToolbar() {
 
   // Add 5 random charts with random data sources
   document.getElementById("add-random-5")!.addEventListener("click", () => {
-    const types: ChartType[] = ["line", "scatter", "bar"];
+    const types: ChartType[] = ["line", "area", "scatter", "bar"];
     for (let i = 0; i < 5; i++) {
       const preset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
       const type =
@@ -1723,7 +1721,16 @@ function setupStats() {
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 async function init() {
-  manager = ChartManager.getInstance();
+  // Register chart renderers
+  manager.use(LineChart);
+  manager.use(AreaChart);
+  manager.use(ScatterChart);
+  manager.use(BarChart);
+
+  // Register UI plugins (applied to all charts by default)
+  manager.use(labelsPlugin);
+  manager.use(zoomPlugin());
+  manager.use(hoverPlugin);
 
   const success = await manager.init();
   if (!success) {

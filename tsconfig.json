@@ -16,11 +16,20 @@
     "outDir": "./dist"
   },
   "include": [
+    "src/types.ts",
     "src/chart-library.ts",
     "src/gpu-worker.ts",
     "src/plugins/hover.ts",
     "src/plugins/labels.ts",
-    "src/plugins/zoom.ts"
+    "src/plugins/labels-panel.ts",
+    "src/plugins/legend.ts",
+    "src/plugins/zoom.ts",
+    "src/charts/line.ts",
+    "src/charts/area.ts",
+    "src/charts/scatter.ts",
+    "src/charts/bar.ts",
+    "src/charts/candlestick.ts",
+    "src/worker-inline.d.ts"
   ],
   "exclude": [
     "node_modules",

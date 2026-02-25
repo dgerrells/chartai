@@ -1,24 +1,25 @@
 // GPU Charts Demo - Consuming the ChartManager library
 
-import { ChartManager, registerPlugin } from "../../src/chart-library.ts";
-import type {
-  ChartType,
-  ChartConfig,
-  ChartSeries,
-  ZoomMode,
-} from "../../src/chart-library.ts";
+import { ChartManager as manager } from "../../src/chart-library.ts";
+import type { Chart } from "../../src/chart-library.ts";
+import type { ChartConfig, ChartSeries, ZoomMode } from "../../src/types.ts";
 import { labelsPlugin } from "../../src/plugins/labels.ts";
 import { zoomPlugin } from "../../src/plugins/zoom.ts";
 import { hoverPlugin } from "../../src/plugins/hover.ts";
+import { legendPlugin } from "../../src/plugins/legend.ts";
+import { LineChart } from "../../src/charts/line.ts";
+import { AreaChart } from "../../src/charts/area.ts";
+import { ScatterChart } from "../../src/charts/scatter.ts";
+import { BarChart } from "../../src/charts/bar.ts";
+import { CandlestickChart } from "../../src/charts/candlestick.ts";
+import { BoidsChart } from "../../src/charts/boids.ts";
 
-registerPlugin(labelsPlugin);
-registerPlugin(zoomPlugin());
-registerPlugin(hoverPlugin);
+type ChartType = "line" | "area" | "scatter" | "bar" | "candlestick" | "boids";
 
 type DataPattern = "stock" | "trending" | "declining" | "spikey" | "cyclic";
 
 interface ChartInstance {
-  id: string;
+  chart: Chart<any>;
   type: ChartType;
   pointCount: number;
   zoomX: boolean;
@@ -26,7 +27,7 @@ interface ChartInstance {
 }
 
 const chartInstances: ChartInstance[] = [];
-let manager: ChartManager;
+// manager is the imported singleton
 let isDark = document.documentElement.classList.contains("dark");
 
 // --- Main-thread frame timing (outside the chart library) ---
@@ -231,6 +232,43 @@ function generateData(
   return { x, y };
 }
 
+function generateOHLC(count: number): { x: number[]; y: number[]; open: number[]; high: number[]; low: number[] } {
+  const x    = new Array<number>(count);
+  const y    = new Array<number>(count); // close
+  const open = new Array<number>(count);
+  const high = new Array<number>(count);
+  const low  = new Array<number>(count);
+
+  let price = 50 + Math.random() * 100;
+  const drift = Math.LN2 / count;
+  const vol   = 0.015;
+  let spare = 0, hasSpare = false;
+  const TWO_PI = 2 * Math.PI;
+
+  for (let i = 0; i < count; i++) {
+    x[i] = i;
+    let z: number;
+    if (hasSpare) { z = spare; hasSpare = false; }
+    else {
+      const u1 = Math.random() || 1e-10;
+      const r = Math.sqrt(-2 * Math.log(u1));
+      const theta = TWO_PI * Math.random();
+      z = r * Math.cos(theta); spare = r * Math.sin(theta); hasSpare = true;
+    }
+    const o = price;
+    const c = Math.max(0.01, price * Math.exp(drift + vol * z));
+    const range = Math.abs(c - o) * (1 + Math.random() * 1.5);
+    const h = Math.max(o, c) + Math.random() * range * 0.5;
+    const l = Math.max(0.01, Math.min(o, c) - Math.random() * range * 0.5);
+    open[i] = o;
+    high[i] = h;
+    low[i]  = l;
+    y[i]    = c;
+    price   = c;
+  }
+  return { x, y, open, high, low };
+}
+
 function formatPrice(value: number): string {
   if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "k";
   return "$" + value.toFixed(2);
@@ -329,29 +367,43 @@ function addChart(
 ) {
   seriesCount = Math.max(1, Math.min(10000, seriesCount));
 
-  // Generate multiple series
+  // Generate series data
   const series: ChartSeries[] = [];
-  for (let i = 0; i < seriesCount; i++) {
-    const data = generateData(pointCount, pattern);
-    // Bar charts clamp Y >= 0 for stock-like patterns (bars grow up from baseline)
-    if (type === "bar" && pattern !== "spikey" && pattern !== "cyclic") {
-      for (let j = 0; j < data.y.length; j++) {
-        data.y[j] = Math.max(0, data.y[j]);
-      }
-    }
 
-    series.push({
-      label: seriesCount > 1 ? `Series ${i + 1}` : "",
-      color: randomColor(),
-      x: data.x,
-      y: data.y,
-    });
+  if (type === "candlestick") {
+    const data = generateOHLC(pointCount);
+    series.push({ label: "", color: randomColor(), x: data.x, y: data.y, open: data.open, high: data.high, low: data.low });
+  } else if (type === "boids") {
+    const numFlocks  = Math.max(1, seriesCount);
+    const boidsCount = Math.max(1, pointCount);
+    for (let fi = 0; fi < numFlocks; fi++) {
+      const angle = (fi / numFlocks) * Math.PI * 2;
+      const cx    = 0.5 + Math.cos(angle) * 0.28;
+      const cy    = 0.5 + Math.sin(angle) * 0.28;
+      const x: number[] = [];
+      const y: number[] = [];
+      for (let i = 0; i < boidsCount; i++) {
+        x.push(cx + (Math.random() - 0.5) * 0.18);
+        y.push(cy + (Math.random() - 0.5) * 0.18);
+      }
+      series.push({ label: "", color: randomColor(), x, y });
+    }
+  } else {
+    for (let i = 0; i < seriesCount; i++) {
+      const data = generateData(pointCount, pattern);
+      if (type === "bar" && pattern !== "spikey" && pattern !== "cyclic") {
+        for (let j = 0; j < data.y.length; j++) data.y[j] = Math.max(0, data.y[j]);
+      }
+      series.push({ label: seriesCount > 1 ? `Series ${i + 1}` : "", color: randomColor(), x: data.x, y: data.y });
+    }
   }
 
-  const isStock = pattern === "stock";
+  const isStock  = pattern === "stock" && type !== "boids";
+  const isBoids  = type === "boids";
 
+  let chart: Chart;
   const instance: ChartInstance = {
-    id: "",
+    chart: null!,
     type,
     pointCount,
     zoomX: true,
@@ -372,16 +424,17 @@ function addChart(
       </div>`
       : "";
 
-  const seriesCountLabel =
-    seriesCount > 1
-      ? `<span class="chart-card-series">×${seriesCount}</span>`
-      : "";
+  const pointsLabel = isBoids
+    ? `${formatCount(series[0]?.x.length ?? pointCount)}×${formatCount(series.length)} boids`
+    : seriesCount > 1
+      ? `${formatCount(pointCount)}×${formatCount(seriesCount)}`
+      : formatCount(pointCount);
 
   card.innerHTML = `
     <div class="chart-card-header">
       <span class="chart-card-title">Chart</span>
       <span class="chart-card-type">${typeLabel}</span>
-      <span class="chart-card-points">${formatCount(pointCount)}</span>${seriesCountLabel}${pointSizeHtml}
+      <span class="chart-card-points">${pointsLabel}</span>${pointSizeHtml}
       <div class="chart-zoom-split">
         <button class="zoom-axis-btn active" data-action="toggle-x" title="Toggle X zoom">X</button>
         <button class="zoom-axis-btn active" data-action="toggle-y" title="Toggle Y zoom">Y</button>
@@ -397,27 +450,27 @@ function addChart(
   document.getElementById("chart-grid")!.appendChild(card);
   const container = card.querySelector(".chart-card-body") as HTMLElement;
 
-  const config: ChartConfig = {
+  const config: ChartConfig & Record<string, unknown> = {
     type,
     container,
     series,
     formatX: isStock ? formatDate : formatIndex,
     formatY: isStock ? formatPrice : formatNumber,
     zoomMode: "both",
-    showTooltip: true,
+    showTooltip: !isBoids,
+    ...(isBoids && { defaultBounds: { minX: -1, maxX: 2, minY: -1, maxY: 2 } }),
   };
 
-  let chartId: string;
   try {
-    chartId = manager.create(config);
+    chart = manager.create(config);
   } catch (e) {
     console.error("Failed to create chart:", e);
     card.remove();
     return;
   }
-  instance.id = chartId;
-  card.dataset.id = chartId;
-  container.id = `chart-container-${chartId}`;
+  instance.chart = chart;
+  card.dataset.id = chart.id;
+  container.id = `chart-container-${chart.id}`;
 
   // Point size slider for scatter charts
   const pointSizeSlider = card.querySelector(
@@ -430,7 +483,7 @@ function addChart(
     pointSizeSlider.addEventListener("input", () => {
       const size = parseInt(pointSizeSlider.value);
       pointSizeLabel.textContent = size + "px";
-      manager.setPointSize(instance.id, size);
+      instance.chart.configure({ pointSize: size });
     });
   }
 
@@ -442,34 +495,22 @@ function addChart(
 
     const action = btn.dataset.action;
     switch (action) {
-      case "reset":
-        manager.resetView(instance.id);
-        break;
-      case "remove":
-        removeChart(instance.id);
-        break;
-      case "toggle-x":
-        toggleAxis(instance, "x", btn, card);
-        break;
-      case "toggle-y":
-        toggleAxis(instance, "y", btn, card);
-        break;
+      case "reset":  instance.chart.resetView(); break;
+      case "remove": removeChart(instance); break;
+      case "toggle-x": toggleAxis(instance, "x", btn, card); break;
+      case "toggle-y": toggleAxis(instance, "y", btn, card); break;
     }
   });
 
   chartInstances.push(instance);
 }
 
-function removeChart(id: string) {
-  manager.destroy(id);
-
-  const idx = chartInstances.findIndex((i) => i.id === id);
-  if (idx >= 0) {
-    chartInstances.splice(idx, 1);
-  }
-
-  const card = document.querySelector(`.chart-card[data-id="${id}"]`);
-  if (card) card.remove();
+function removeChart(instance: ChartInstance) {
+  const id = instance.chart.id;
+  instance.chart.destroy();
+  const idx = chartInstances.indexOf(instance);
+  if (idx >= 0) chartInstances.splice(idx, 1);
+  document.querySelector(`.chart-card[data-id="${id}"]`)?.remove();
 }
 
 function toggleAxis(
@@ -496,7 +537,7 @@ function toggleAxis(
   else if (instance.zoomY) mode = "y-only";
   else mode = "none";
 
-  manager.setZoomMode(instance.id, mode);
+  instance.chart.configure({ zoomMode: mode });
 }
 
 function setupTheme() {
@@ -521,7 +562,17 @@ function setupTheme() {
 }
 
 async function init() {
-  manager = ChartManager.getInstance();
+
+  manager.use(LineChart);
+  manager.use(AreaChart);
+  manager.use(ScatterChart);
+  manager.use(BarChart);
+  manager.use(CandlestickChart);
+  manager.use(BoidsChart);
+  manager.use(labelsPlugin);
+  manager.use(zoomPlugin());
+  manager.use(hoverPlugin);
+  manager.use(legendPlugin);
 
   const success = await manager.init();
   if (!success) {
@@ -548,16 +599,33 @@ async function init() {
 }
 
 function setupControls() {
-  const typeSelect = document.getElementById("chart-type") as HTMLSelectElement;
-  const pointsInput = document.getElementById(
-    "point-count",
-  ) as HTMLInputElement;
+  const typeSelect    = document.getElementById("chart-type") as HTMLSelectElement;
+  const pointsInput   = document.getElementById("point-count") as HTMLInputElement;
+  const pointsLabel   = pointsInput.closest(".control-group")!.querySelector(".control-label")!;
+  const seriesInput   = document.getElementById("series-count") as HTMLInputElement;
+  const seriesLabel   = seriesInput.closest(".control-group")!.querySelector(".control-label")!;
+  const patternGroup  = document.getElementById("pattern")!.closest(".control-group") as HTMLElement;
   const patternSelect = document.getElementById("pattern") as HTMLSelectElement;
-  const syncToggle = document.getElementById("sync-toggle") as HTMLInputElement;
-  const syncLabel = document.getElementById("sync-label")!;
-  const seriesInput = document.getElementById(
-    "series-count",
-  ) as HTMLInputElement;
+  const syncToggle    = document.getElementById("sync-toggle") as HTMLInputElement;
+  const syncLabel     = document.getElementById("sync-label")!;
+
+  const applyBoidsMode = (boids: boolean) => {
+    if (boids) {
+      pointsLabel.textContent = "Boids/flock";
+      seriesLabel.textContent = "Flocks";
+      pointsInput.step = "10";
+      patternGroup.style.visibility = "hidden";
+    } else {
+      pointsLabel.textContent = "Points";
+      seriesLabel.textContent = "Series";
+      pointsInput.step = "1000";
+      patternGroup.style.visibility = "";
+    }
+  };
+
+  typeSelect.addEventListener("change", () =>
+    applyBoidsMode(typeSelect.value === "boids")
+  );
 
   document.getElementById("add-chart")!.addEventListener("click", () => {
     const type = typeSelect.value as ChartType;
@@ -587,9 +655,7 @@ function setupControls() {
   });
 
   document.getElementById("clear-all")!.addEventListener("click", () => {
-    for (const instance of [...chartInstances]) {
-      removeChart(instance.id);
-    }
+    for (const instance of [...chartInstances]) removeChart(instance);
   });
 
   syncToggle.addEventListener("change", () => {
