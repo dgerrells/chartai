@@ -23,6 +23,14 @@ This library was inspired by uplot which is likely all you need. But if you do n
 
 Cool. How do I use it?
 
+### Install
+
+Pick your fav
+* `npm install chartai`
+* `yarn add chartai`
+* `pnpm install chartai`
+* `bun add chartai`
+
 ### Add a line chart
 
 ```js
