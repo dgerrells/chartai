@@ -14,7 +14,7 @@ This library was inspired by uplot which is likely all you need. But if you do n
 
 * Tiny, unlimited line charts at ~11kb
 * Customizable with plugins
-* Lines, scatter, bar, adn candlestick out of the box
+* Lines, scatter, bar, and candlestick out of the box
 * Chart synchronization
 * Stupid faster compute shaders
 * Passively rendered, automatic virtualization
