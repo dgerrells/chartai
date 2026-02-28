@@ -257,7 +257,9 @@
 
     .toggle-slider {
       width: 44px;
+      min-width: 44px;
       height: 24px;
+      flex-shrink: 0;
       background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -308,6 +310,18 @@
 
     .chart-wrapper.full-width {
       grid-column: 1 / -1;
+    }
+
+    @media (min-width: 769px) {
+      .chart-row {
+        min-height: 400px;
+      }
+      .chart-wrapper {
+        min-height: 400px;
+      }
+      .chart-body {
+        min-height: 360px;
+      }
     }
 
     @media (max-width: 768px) {
@@ -551,6 +565,150 @@
       </div>
     </div>
 
+    <!-- Step Chart -->
+    <div class="section">
+      <h2 class="section-title">Step Chart</h2>
+      <p class="section-description">Right-angle step interpolation. Three modes: after (step at right), before (step at left), center (step at midpoint)</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">after</span><span class="chart-info">Step at right edge</span></div>
+          <div class="chart-body" id="chart-step-after"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">before</span><span class="chart-info">Step at left edge</span></div>
+          <div class="chart-body" id="chart-step-before"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">center</span><span class="chart-info">Step at midpoint</span></div>
+          <div class="chart-body" id="chart-step-center"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Histogram -->
+    <div class="section">
+      <h2 class="section-title">Histogram</h2>
+      <p class="section-description">GPU-binned frequency distribution from continuous data. Auto-bins to chart width; configurable binCount, minValue, maxValue</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Normal Distribution</span><span class="chart-info">10,000 samples</span></div>
+          <div class="chart-body" id="chart-histogram-normal"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Multi-Series</span><span class="chart-info">3 distributions</span></div>
+          <div class="chart-body" id="chart-histogram-multi"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Skewed</span><span class="chart-info">Log-normal</span></div>
+          <div class="chart-body" id="chart-histogram-skewed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="section">
+      <h2 class="section-title">Heatmap</h2>
+      <p class="section-description">2D color grid. Series x[]=column, y[]=row, value[]=intensity (0–1). Four built-in color scales</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Viridis</span><span class="chart-info">12×12 grid</span></div>
+          <div class="chart-body" id="chart-heatmap-viridis"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Plasma</span><span class="chart-info">12×12 grid</span></div>
+          <div class="chart-body" id="chart-heatmap-plasma"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Warm</span><span class="chart-info">12×12 grid</span></div>
+          <div class="chart-body" id="chart-heatmap-warm"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Cool</span><span class="chart-info">12×12 grid</span></div>
+          <div class="chart-body" id="chart-heatmap-cool"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bubble -->
+    <div class="section">
+      <h2 class="section-title">Bubble Chart</h2>
+      <p class="section-description">Scatter + size encoding. Series requires r[] extra array for per-point radius in data units</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Bubble Chart</span><span class="chart-info">300 points, variable radius</span></div>
+          <div class="chart-body" id="chart-bubble"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Multi-Series Bubbles</span><span class="chart-info">3 clusters</span></div>
+          <div class="chart-body" id="chart-bubble-multi"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Baseline Area -->
+    <div class="section">
+      <h2 class="section-title">Baseline Area</h2>
+      <p class="section-description">Area filled above/below a configurable Y baseline with separate positive/negative colors. Ideal for P&amp;L, deviation charts</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">P&amp;L (baseline: 0)</span><span class="chart-info">Green above, red below</span></div>
+          <div class="chart-body" id="chart-baseline-pnl"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Temperature Deviation</span><span class="chart-info">Custom baseline + colors</span></div>
+          <div class="chart-body" id="chart-baseline-temp"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Band -->
+    <div class="section">
+      <h2 class="section-title">Error Band</h2>
+      <p class="section-description">Central line with shaded confidence band between lo[] and hi[] extra arrays. Use for model uncertainty, Bollinger bands, prediction intervals</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Confidence Interval</span><span class="chart-info">Widening uncertainty</span></div>
+          <div class="chart-body" id="chart-error-band"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Bollinger Bands</span><span class="chart-info">±2σ rolling window</span></div>
+          <div class="chart-body" id="chart-error-bollinger"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OHLC -->
+    <div class="section">
+      <h2 class="section-title">OHLC Chart</h2>
+      <p class="section-description">Classic open-high-low-close tick marks: vertical stick for range, left tick for open, right tick for close. Shares the same data format as candlestick</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">OHLC Ticks</span><span class="chart-info">500 bars</span></div>
+          <div class="chart-body" id="chart-ohlc"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Candlestick (same data)</span><span class="chart-info">For comparison</span></div>
+          <div class="chart-body" id="chart-ohlc-candle-compare"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Waterfall -->
+    <div class="section">
+      <h2 class="section-title">Waterfall Chart</h2>
+      <p class="section-description">Sequential cumulative bars showing contribution of each value. Pass total:[] extra array to mark reset-to-zero summary bars</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Quarterly Bridge</span><span class="chart-info">Revenue breakdown</span></div>
+          <div class="chart-body" id="chart-waterfall"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">P&amp;L Bridge</span><span class="chart-info">With totals</span></div>
+          <div class="chart-body" id="chart-waterfall-totals"></div>
+        </div>
+      </div>
+    </div>
+
     <h2 class="landing-section-heading">Plugins</h2>
 
     <!-- Legend -->
@@ -633,6 +791,170 @@
         <div class="chart-wrapper">
           <div class="chart-header"><span class="chart-label">showTooltip: false</span></div>
           <div class="chart-body" id="hover-no-tooltip"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Annotations -->
+    <div class="section">
+      <h2 class="section-title">Annotations</h2>
+      <p class="section-description">Reference lines and shaded regions at data values. Types: hline, vline, hregion, vregion — each with optional label, color, dash pattern</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">hline + vline</span><span class="chart-info">Support/resistance + event</span></div>
+          <div class="chart-body" id="plugin-annotations-lines"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">hregion + vregion</span><span class="chart-info">Zone fills</span></div>
+          <div class="chart-body" id="plugin-annotations-regions"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Combined</span><span class="chart-info">All annotation types</span></div>
+          <div class="chart-body" id="plugin-annotations-combined"></div>
+        </div>
+      </div>
+      <div class="chart-row" style="margin-top:12px;">
+        <div class="chart-wrapper" style="flex:1 1 100%;">
+          <div class="chart-header"><span class="chart-label">Interactive</span><span class="chart-info">Add/remove annotations dynamically</span></div>
+          <div class="chart-body" id="plugin-annotations-interactive"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threshold -->
+    <div class="section">
+      <h2 class="section-title">Threshold</h2>
+      <p class="section-description">Colored fill bands above/below configurable Y thresholds with labeled lines. Highlight danger zones, targets, or alert levels</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Alert Zones</span><span class="chart-info">fillAbove + fillBelow</span></div>
+          <div class="chart-body" id="plugin-threshold-zones"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Target Line</span><span class="chart-info">Single threshold</span></div>
+          <div class="chart-body" id="plugin-threshold-target"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Crosshair -->
+    <div class="section">
+      <h2 class="section-title">Crosshair</h2>
+      <p class="section-description">Lightweight cursor guide lines with no snapping or tooltip overhead. Configurable axes, color, and dash pattern</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">X + Y</span><span class="chart-info">Both axes</span></div>
+          <div class="chart-body" id="plugin-crosshair-both"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">X only</span><span class="chart-info">Vertical guide</span></div>
+          <div class="chart-body" id="plugin-crosshair-x"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Custom style</span><span class="chart-info">Color + dash</span></div>
+          <div class="chart-body" id="plugin-crosshair-custom"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Watermark -->
+    <div class="section">
+      <h2 class="section-title">Watermark</h2>
+      <p class="section-description">Semi-transparent text drawn behind the GPU chart layer. Configurable position, opacity, font size, and rotation</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Center (diagonal)</span><span class="chart-info">Default −30° rotation</span></div>
+          <div class="chart-body" id="plugin-watermark-center"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Corner positions</span><span class="chart-info">top-right + bottom-left</span></div>
+          <div class="chart-body" id="plugin-watermark-corner"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">High opacity</span><span class="chart-info">watermarkOpacity: 0.18</span></div>
+          <div class="chart-body" id="plugin-watermark-strong"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2 class="section-title">Stats</h2>
+      <p class="section-description">Live DOM panel showing min/max/mean/σ for the currently visible data window. Updates on every pan/zoom</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">top-left panel</span><span class="chart-info">Pan/zoom to update</span></div>
+          <div class="chart-body" id="plugin-stats-tl"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">top-right panel</span><span class="chart-info">Multi-series aggregate</span></div>
+          <div class="chart-body" id="plugin-stats-tr"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ruler -->
+    <div class="section">
+      <h2 class="section-title">Ruler</h2>
+      <p class="section-description">Click "Ruler" button to activate, then click two points to measure. Right-click or click near an endpoint to remove. Press Escape to cancel.</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">X-axis measurement</span><span class="chart-info">rulerAxis: "x"</span></div>
+          <div class="chart-body" id="plugin-ruler-x"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Y-axis measurement</span><span class="chart-info">rulerAxis: "y"</span></div>
+          <div class="chart-body" id="plugin-ruler-y"></div>
+        </div>
+      </div>
+      <div class="chart-row chart-row-compact" style="margin-top:16px;">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Both axes</span><span class="chart-info">rulerAxis: "both"</span></div>
+          <div class="chart-body" id="plugin-ruler-both"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tooltip Pin -->
+    <div class="section">
+      <h2 class="section-title">Tooltip Pin</h2>
+      <p class="section-description">Click to pin a floating tooltip at any data point. Up to 5 pins persist through pan/zoom. Click near a pin to remove it</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Click to pin points</span><span class="chart-info">Up to 5 simultaneous pins</span></div>
+          <div class="chart-body" id="plugin-tooltip-pin"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">Multi-series pins</span><span class="chart-info">Color-coded per series</span></div>
+          <div class="chart-body" id="plugin-tooltip-pin-multi"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimap -->
+    <div class="section">
+      <h2 class="section-title">Minimap</h2>
+      <p class="section-description">Corner viewport thumbnail showing full data with a highlighted rectangle for the current view. Click thumbnail to jump to that region</p>
+      <div class="chart-row chart-row-compact">
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">bottom-right (default)</span><span class="chart-info">Click thumbnail to jump</span></div>
+          <div class="chart-body" id="plugin-minimap-br"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-header"><span class="chart-label">top-left</span><span class="chart-info">minimapPosition: top-left</span></div>
+          <div class="chart-body" id="plugin-minimap-tl"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Range Selector -->
+    <div class="section">
+      <h2 class="section-title">Range Selector</h2>
+      <p class="section-description">Mini overview canvas appended below the chart. Drag the brush window to pan/zoom the main chart. Resize brush edges to zoom</p>
+      <div class="chart-row">
+        <div class="chart-wrapper full-width" style="overflow:visible">
+          <div class="chart-header"><span class="chart-label">Range Selector</span><span class="chart-info">Drag brush to navigate · resize edges to zoom</span></div>
+          <div class="chart-body" id="plugin-range-selector"></div>
         </div>
       </div>
     </div>

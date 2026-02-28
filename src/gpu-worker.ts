@@ -63,6 +63,7 @@ interface ChartSeriesData {
   pointCount: number;
   visibleStart: number;
   visibleCount: number;
+  hidden: boolean;
   passBindGroups: (GPUBindGroup | null)[];
 }
 
@@ -471,7 +472,7 @@ function renderChart(chart: Chart): void {
       if (pass.perSeries) {
         for (let si = 0; si < chart.series.length; si++) {
           const series = chart.series[si];
-          if (series.pointCount === 0) continue;
+          if (series.pointCount === 0 || series.hidden) continue;
 
           writeUniforms(chart, series);
 
@@ -514,7 +515,7 @@ function renderChart(chart: Chart): void {
       if (pass.perSeries) {
         for (let si = 0; si < chart.series.length; si++) {
           const series = chart.series[si];
-          if (series.pointCount === 0) continue;
+          if (series.pointCount === 0 || series.hidden) continue;
           const bg = series.passBindGroups[passIdx];
           if (!bg) continue;
           rp.setBindGroup(0, bg);
@@ -662,6 +663,7 @@ function processUpdateSeries(
     dataX: Float32Array;
     dataY: Float32Array;
     extra: Record<string, Float32Array>;
+    hidden: boolean;
   }>,
   bounds: { minX: number; maxX: number; minY: number; maxY: number },
   bufferSizes: Record<string, number>,
@@ -732,6 +734,7 @@ function processUpdateSeries(
         pointCount: sd.dataX.length,
         visibleStart: 0,
         visibleCount: sd.dataX.length,
+        hidden: sd.hidden ?? false,
         passBindGroups: [],
       };
       chart.series.push(series);
@@ -946,6 +949,10 @@ self.onmessage = async (e: MessageEvent) => {
       const chart = charts.get(data.id);
       if (chart) {
         if (data.bgColor !== undefined) chart.bgColor = data.bgColor;
+        if (data.hiddenSeries !== undefined) {
+          for (let i = 0; i < chart.series.length; i++)
+            chart.series[i].hidden = (data.hiddenSeries as Set<number>).has(i);
+        }
         markDirty(chart);
       }
       break;

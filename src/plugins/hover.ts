@@ -14,7 +14,13 @@ function findNearestPoint(
   height: number,
 ): HoverData | null {
   if (chart.series.length === 0) return null;
-  const { x: dataX, y: dataY } = screenToData(screenX, screenY, chart, width, height);
+  const { x: dataX, y: dataY } = screenToData(
+    screenX,
+    screenY,
+    chart,
+    width,
+    height,
+  );
   const rX = chart.bounds.maxX - chart.bounds.minX;
   const vW = rX / chart.view.zoomX;
   const vMinX = chart.bounds.minX + chart.view.panX * rX;
@@ -24,6 +30,7 @@ function findNearestPoint(
     bdx = Infinity,
     bdy = Infinity;
   for (let s = 0; s < chart.series.length; s++) {
+    if (chart.config?.hiddenSeries?.has(s)) continue;
     const sr = chart.series[s];
     const n = sr.rawX.length;
     if (n === 0) continue;
@@ -226,7 +233,8 @@ export const hoverPlugin: ChartPlugin<HoverConfig> = {
       col: string;
     };
     const seriesData = chart.series
-      .map((ser): SeriesPoint | null => {
+      .map((ser, si): SeriesPoint | null => {
+        if (chart.config?.hiddenSeries?.has(si)) return null;
         let l = 0,
           r = ser.rawX.length - 1;
         while (l <= r) {

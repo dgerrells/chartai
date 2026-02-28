@@ -78,8 +78,8 @@ const LEGEND_HTML = `
 <div class="chart-legend-overlay" style="position:absolute;inset:0;pointer-events:none;z-index:20">
   <div class="chart-legend-container" style="position:absolute;top:4px;right:4px;width:${ICON_SIZE}px;height:${ICON_SIZE}px;overflow:hidden;border-radius:50%;pointer-events:auto;transition:width .2s ease,height .2s ease,border-radius .2s ease">
     <button type="button" class="chart-legend-icon" title="Legend" style="position:absolute;inset:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border:none;border-radius:inherit;cursor:pointer;flex-shrink:0;transition:transform .18s ease,opacity .2s ease"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></button>
-    <div class="chart-legend-panel" style="position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;border-radius:inherit;padding:10px 12px">
-      <div class="chart-legend-scroll" style="flex:1;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch">
+    <div class="chart-legend-panel" style="position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;border-radius:inherit">
+      <div class="chart-legend-scroll" style="flex:1;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:10px 12px">
         <div class="chart-legend-list" style="display:flex;flex-direction:column;gap:4px"></div>
       </div>
     </div>
@@ -122,6 +122,46 @@ export const legendPlugin: ChartPlugin<LegendConfig> = {
       passive: false,
       signal: ac.signal,
     });
+
+    list.addEventListener(
+      "pointerdown",
+      (e) => {
+        const row = (e.target as Element).closest<HTMLElement>(
+          ".chart-legend-row",
+        );
+        if (!row) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const idx = Number(row.dataset.series);
+        if (isNaN(idx)) return;
+        const current = new Set(
+          (chart.config as ChartConfig).hiddenSeries ?? [],
+        );
+        if (current.has(idx)) current.delete(idx);
+        else current.add(idx);
+        const isNowHidden = current.has(idx);
+        const ser = chart.series[idx];
+        if (ser) {
+          const col = `rgb(${ser.color.r * 100}% ${ser.color.g * 100}% ${ser.color.b * 100}%)`;
+          const swatch = row.querySelector<HTMLElement>(
+            ".chart-legend-swatch",
+          )!;
+          const labelEl = row.querySelector<HTMLElement>(
+            ".chart-legend-label",
+          )!;
+          swatch.style.background = isNowHidden ? "transparent" : col;
+          swatch.style.border = isNowHidden ? `1.5px solid ${col}` : "";
+          labelEl.style.opacity = isNowHidden ? "0.4" : "";
+          swatch.classList.remove("chart-legend-swatch--bounce");
+          labelEl.classList.remove("chart-legend-label--bounce");
+          void swatch.offsetWidth;
+          swatch.classList.add("chart-legend-swatch--bounce");
+          labelEl.classList.add("chart-legend-label--bounce");
+        }
+        ChartManager.setHiddenSeries(chart.id, [...current]);
+      },
+      { capture: true, signal: ac.signal },
+    );
 
     const cfg = getLegendConfig(chart);
     const alwaysOpen = cfg.alwaysOpen ?? false;
@@ -259,43 +299,77 @@ function computePanelWidth(
 function syncSeries(chart: InternalChart<ChartConfig & LegendConfig>) {
   const s = states.get(chart);
   if (!s) return;
-  const series = chart.series;
   const key = seriesKey(chart);
-  if (key === s.lastSeriesKey) return;
+  if (key === s.lastSeriesKey) {
+    applyHiddenState(chart, s);
+    return;
+  }
   s.lastSeriesKey = key;
+  rebuildRows(chart, s);
+}
 
+function rebuildRows(
+  chart: InternalChart<ChartConfig & LegendConfig>,
+  s: LegendState,
+) {
+  const series = chart.series;
   const maxChars =
     getLegendConfig(chart).maxLabelChars ?? DEFAULT_MAX_LABEL_CHARS;
   const labels = series.map((ser, i) => ser.label || `Series ${i + 1}`);
   s.computedWidth = computePanelWidth(chart, labels);
 
+  const hidden =
+    (chart.config as ChartConfig).hiddenSeries ?? new Set<number>();
   const rowBase =
-    "display:flex;align-items:center;gap:8px;min-width:0;padding-right:8px";
+    "display:flex;align-items:center;gap:8px;min-width:0;padding-right:8px;cursor:pointer;user-select:none";
   const rowAnim =
     ";opacity:0;transform:translateY(6px);animation:chart-legend-row-in .25s cubic-bezier(.34,1.2,.64,1) forwards";
-  const swatchStyle = "width:10px;height:10px;border-radius:2px;flex-shrink:0";
-  const labelStyle =
-    "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+  const swatchBase =
+    "width:10px;height:10px;border-radius:2px;flex-shrink:0;box-sizing:border-box";
+  const labelBase =
+    "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:opacity .15s ease";
 
-  const rows = series
+  s.list.innerHTML = series
     .map((ser, i) => {
-      const r = Math.round(ser.color.r * 255);
-      const g = Math.round(ser.color.g * 255);
-      const b = Math.round(ser.color.b * 255);
+      const col = `rgb(${ser.color.r * 100}% ${ser.color.g * 100}% ${ser.color.b * 100}%)`;
       let label = ser.label || `Series ${i + 1}`;
       if (label.length > maxChars) label = label.slice(0, maxChars - 1) + "…";
       const animDelay = Math.min(0.02 + i * 0.02, 0.02 + 7 * 0.02);
-      return `<div class="chart-legend-row" style="${rowBase}${rowAnim};animation-delay:${animDelay}s"><span class="chart-legend-swatch" style="${swatchStyle};background:rgb(${r},${g},${b})"></span><span class="chart-legend-label" style="${labelStyle}">${escapeHtml(label)}</span></div>`;
+      const isHidden = hidden.has(i);
+      const swatchStyle = isHidden
+        ? `${swatchBase};background:transparent;border:1.5px solid ${col}`
+        : `${swatchBase};background:${col}`;
+      const labelOpacity = isHidden ? "opacity:0.4;" : "";
+      return `<div class="chart-legend-row" data-series="${i}" style="${rowBase}${rowAnim};animation-delay:${animDelay}s"><span class="chart-legend-swatch" style="${swatchStyle}"></span><span class="chart-legend-label" style="${labelOpacity}${labelBase}">${escapeHtml(label)}</span></div>`;
     })
     .join("");
-
-  s.list.innerHTML = rows;
 
   if (s.open) {
     const packedH = s.list.scrollHeight + 20;
     s.container.style.width = `${s.computedWidth}px`;
     s.container.style.height = `${Math.min(PANEL_MAX_HEIGHT, packedH)}px`;
   }
+}
+
+function applyHiddenState(
+  chart: InternalChart<ChartConfig & LegendConfig>,
+  s: LegendState,
+) {
+  const hidden =
+    (chart.config as ChartConfig).hiddenSeries ?? new Set<number>();
+  s.list.querySelectorAll<HTMLElement>(".chart-legend-row").forEach((row) => {
+    const i = Number(row.dataset.series);
+    if (isNaN(i)) return;
+    const ser = chart.series[i];
+    if (!ser) return;
+    const col = `rgb(${ser.color.r * 100}% ${ser.color.g * 100}% ${ser.color.b * 100}%)`;
+    const isHidden = hidden.has(i);
+    const swatch = row.querySelector<HTMLElement>(".chart-legend-swatch")!;
+    const labelEl = row.querySelector<HTMLElement>(".chart-legend-label")!;
+    swatch.style.background = isHidden ? "transparent" : col;
+    swatch.style.border = isHidden ? `1.5px solid ${col}` : "";
+    labelEl.style.opacity = isHidden ? "0.4" : "";
+  });
 }
 
 function escapeHtml(s: string): string {
@@ -359,6 +433,22 @@ function injectLegendKeyframes() {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+    @keyframes chart-legend-swatch-bounce {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.5); }
+      60%  { transform: scale(0.82); }
+      80%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+    .chart-legend-swatch--bounce { animation: chart-legend-swatch-bounce 0.28s ease-out; }
+    @keyframes chart-legend-label-bounce {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.05); }
+      60%  { transform: scale(0.97); }
+      80%  { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+    .chart-legend-label--bounce { animation: chart-legend-label-bounce 0.28s ease-out; }
     .chart-legend-scroll::-webkit-scrollbar { width: 6px; }
     .chart-legend-scroll::-webkit-scrollbar-track { background: transparent; }
     .chart-legend-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }

@@ -8,18 +8,18 @@ const BOID_STATE = `struct BoidState { pos: vec2f, vel: vec2f, species: u32, _pa
 // These constants only define the ratio between the two.
 const PERCEPTION = 0.2; // reference unit — only the ratio to SEP_R matters
 const SEP_R = PERCEPTION * 0.2; // separation kicks in at 70% of perception radius
-const MAX_SPD = 0.0025; // constant boid speed per frame (data-space)
-const TURN_RATE = 0.25; // fraction of heading change applied per frame (0=no turn, 1=instant)
+const MAX_SPD = 0.003; // constant boid speed per frame (data-space)
+const TURN_RATE = 0.7; // fraction of heading change applied per frame (0=no turn, 1=instant)
 
 // Flocking weights
-const W_SEP = 0.1; // separation  — direct push, fraction of dynMaxSpd per neighbour
-const W_ALIGN = 0.05; // alignment   — steer toward avg neighbour velocity
-const W_COH = 0.02; // cohesion    — steer toward centre of mass
-const W_NOISE = 0.15; // noise       — fraction of MAX_SPD added as random jitter
+const W_SEP = 0.15; // separation  — direct push, fraction of dynMaxSpd per neighbour
+const W_ALIGN = 0.02; // alignment   — steer toward avg neighbour velocity
+const W_COH = 0.001; // cohesion    — steer toward centre of mass
+const W_NOISE = 0.2; // noise       — fraction of MAX_SPD added as random jitter
 
 // Containment — inverse-square ellipse repulsion
 const CONTAIN_STRENGTH = 0.003; // bW = dynMaxSpd × CONTAIN_STRENGTH (linear, like flocking weights)
-const CONTAIN_PAD = 0.3; // unused by ellipse containment, kept for reference
+const CONTAIN_PAD = 0.1; // unused by ellipse containment, kept for reference
 
 // Spatial grid — dimensions only; origin and cell size are computed dynamically
 // from the view uniforms each frame so the grid always covers the visible area.

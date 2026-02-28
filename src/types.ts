@@ -29,6 +29,7 @@ export interface ChartSeries {
   color: ChartColor | string;
   x: number[];
   y: number[];
+  hidden?: boolean;
   [key: string]: any;
 }
 
@@ -94,6 +95,7 @@ export interface ChartConfig {
   series: ChartSeries[];
   defaultBounds?: { minX?: number; maxX?: number; minY?: number; maxY?: number };
   bgColor?: [number, number, number];
+  hiddenSeries?: Set<number>;
 }
 
 // Augmented by renderer modules (e.g. `declare module "../types.ts" { interface ChartTypeRegistry { line: LineConfig } }`)
@@ -137,6 +139,7 @@ export interface InternalChart<C extends ChartConfig = ChartConfig> {
   }>;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
   view: { panX: number; panY: number; zoomX: number; zoomY: number };
+  homeView: { panX: number; panY: number; zoomX: number; zoomY: number };
   visible: boolean;
   dragging: boolean;
   plugins: ChartPlugin<any>[];

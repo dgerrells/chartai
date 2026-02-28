@@ -10,7 +10,7 @@ chartai is a library that can draw millions and millions of lines across thousan
 
 ## Why chartai?
 
-This library was inspired by uplot which is likely all you need. But if you do need the performance without the bundle bloat, this may do it.
+This library was inspired by uplot which is likely all you need. But if you do need the performance without the bundle bloat, this may do it. With all the core charts and plugins, chartai is about the same size as uplot.
 
 * Tiny, unlimited line charts at ~11kb
 * Customizable with plugins
@@ -19,6 +19,7 @@ This library was inspired by uplot which is likely all you need. But if you do n
 * Stupid faster compute shaders
 * Passively rendered, automatic virtualization
 * Doesn't miss the spikes in data, unless you want it to
+* Typescript, No dependencies
 
 Cool. How do I use it?
 
@@ -105,11 +106,13 @@ function Chart() {
 
 ## Design
 
-A little layer communicates with a web worker that does all the web gpu rendering. The design is pretty simple. Everything is a plugin. Both charts and well, plugins. The best way to see how to write your own plugins and charts is to look at the ones that exist.
+A little layer communicates with a web worker that does all the gpu rendering. The design is pretty simple. Everything is a plugin. Both charts and well, plugins. The best way to see how to write your own plugins and charts is to look at the ones that already exist.
 
 Yes, you can point an agent at the examples and it will understand it. 
 
-To demonstrate just how well it works there is a boids simulation chart where the chart data functions as starting locations for the boids. It is totally overkill and ridiculous and silly. It does show how powerful the framework is.
+To demonstrate just how well it works there is a boids simulation chart where the chart data functions as starting locations for the boids. It is totally overkill and ridiculous and silly. It does show the power of the framework.
+
+Some charts and plugins are AI generated without thorough review. They are listed under an `/experimental` folder to make it explicit they are not polished.
 
 ## Gotchas
 

@@ -156,17 +156,38 @@ async function buildLib() {
     path.join(SRC, "chart-library.ts"),
     path.join(SRC, "types.ts"),
     path.join(SRC, "gpu-worker.ts"),
+    // Core plugins
     path.join(SRC, "plugins/hover.ts"),
     path.join(SRC, "plugins/labels.ts"),
     path.join(SRC, "plugins/labels-panel.ts"),
     path.join(SRC, "plugins/legend.ts"),
     path.join(SRC, "plugins/zoom.ts"),
+    // Core charts
     path.join(SRC, "charts/line.ts"),
     path.join(SRC, "charts/area.ts"),
     path.join(SRC, "charts/scatter.ts"),
     path.join(SRC, "charts/bar.ts"),
     path.join(SRC, "charts/candlestick.ts"),
     path.join(SRC, "charts/boids.ts"),
+    // Experimental charts
+    path.join(SRC, "charts/experimental/step.ts"),
+    path.join(SRC, "charts/experimental/histogram.ts"),
+    path.join(SRC, "charts/experimental/heatmap.ts"),
+    path.join(SRC, "charts/experimental/bubble.ts"),
+    path.join(SRC, "charts/experimental/baseline-area.ts"),
+    path.join(SRC, "charts/experimental/error-band.ts"),
+    path.join(SRC, "charts/experimental/ohlc.ts"),
+    path.join(SRC, "charts/experimental/waterfall.ts"),
+    // Experimental plugins
+    path.join(SRC, "plugins/experimental/annotations.ts"),
+    path.join(SRC, "plugins/experimental/crosshair.ts"),
+    path.join(SRC, "plugins/experimental/minimap.ts"),
+    path.join(SRC, "plugins/experimental/range-selector.ts"),
+    path.join(SRC, "plugins/experimental/ruler.ts"),
+    path.join(SRC, "plugins/experimental/stats.ts"),
+    path.join(SRC, "plugins/experimental/threshold.ts"),
+    path.join(SRC, "plugins/experimental/tooltip-pin.ts"),
+    path.join(SRC, "plugins/experimental/watermark.ts"),
   ];
 
   // Readable build (splitting enables code reuse and smaller bundles)

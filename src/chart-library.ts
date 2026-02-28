@@ -79,7 +79,14 @@ export class Chart<C extends ChartConfig = ChartConfig> {
       });
     }
 
-    // Background color — sync DOM and worker
+    if ("hiddenSeries" in patch) {
+      this._mgr["worker"]?.postMessage({
+        type: M.SET_STYLE,
+        id: this.id,
+        hiddenSeries: patch.hiddenSeries ?? new Set<number>(),
+      });
+    }
+
     if ("bgColor" in patch && patch.bgColor !== undefined) {
       const [r, g, b] = patch.bgColor as [number, number, number];
       const wrap = c.el.querySelector("div") as HTMLElement;
@@ -400,11 +407,11 @@ class _ChartManager {
   ): Chart<C & AllPluginOptions>;
   // Implementation
   create(config: any): Chart<any> {
-    if (!this.worker) throw new Error("Call init() before create().");
+    if (!this.worker) throw new Error("No worker. Call init().");
     const renderer = this.renderers.get(config.type);
     if (!renderer)
       throw new Error(
-        `No renderer "${config.type}". Call manager.use() with a matching RendererPlugin first.`,
+        `No renderer "${config.type}". Call manager.use() first.`,
       );
 
     const id = `chart-${++this.chartIdCounter}`;
@@ -434,7 +441,7 @@ class _ChartManager {
     try {
       offscreen = gpuCanvas.transferControlToOffscreen();
     } catch (e) {
-      throw new Error(`Failed to acquire OffscreenCanvas: ${e}`);
+      throw new Error(`Failed OffscreenCanvas: ${e}`);
     }
 
     const rect = wrap.getBoundingClientRect();
@@ -465,6 +472,7 @@ class _ChartManager {
       series: [],
       bounds: { minX: 0, maxX: 1, minY: 0, maxY: 1 },
       view: { panX: 0, panY: 0, zoomX: 1, zoomY: 1 },
+      homeView: { panX: 0, panY: 0, zoomX: 1, zoomY: 1 },
       visible: true,
       dragging: false,
       plugins: [...this.uiPlugins],
@@ -521,6 +529,11 @@ class _ChartManager {
   updateSeries(id: string, series: ChartSeries[]): void {
     const chart = this.charts.get(id);
     if (!chart || !this.worker || series.length === 0) return;
+
+    chart.config.hiddenSeries = series.reduce<Set<number>>((acc, s, i) => {
+      if (s.hidden) acc.add(i);
+      return acc;
+    }, new Set());
 
     chart.series = series.map((s) => {
       const n = s.x.length;
@@ -591,7 +604,8 @@ class _ChartManager {
       chart,
     );
 
-    const seriesData = chart.series.map((s) => {
+    const hidden = chart.config.hiddenSeries ?? new Set<number>();
+    const seriesData = chart.series.map((s, i) => {
       const extra: Record<string, Float32Array> = {};
       for (const key in s.extra) extra[key] = new Float32Array(s.extra[key]);
       return {
@@ -602,6 +616,7 @@ class _ChartManager {
         dataX: new Float32Array(s.rawX),
         dataY: new Float32Array(s.rawY),
         extra,
+        hidden: hidden.has(i),
       };
     });
 
@@ -654,21 +669,34 @@ class _ChartManager {
     for (const p of chart.plugins) p.resetView?.(chart);
 
     const { panX: spx, panY: spy, zoomX: szx, zoomY: szy } = chart.view;
+    const { panX: tpx, panY: tpy, zoomX: tzx, zoomY: tzy } = chart.homeView;
     const t0 = performance.now();
 
     const animate = () => {
       const t = Math.min(1, (performance.now() - t0) / 300);
       const e = 1 - Math.pow(1 - t, 3);
-      chart.view.panX = spx * (1 - e);
-      chart.view.panY = spy * (1 - e);
-      chart.view.zoomX = szx + (1 - szx) * e;
-      chart.view.zoomY = szy + (1 - szy) * e;
+      chart.view.panX = spx + (tpx - spx) * e;
+      chart.view.panY = spy + (tpy - spy) * e;
+      chart.view.zoomX = szx + (tzx - szx) * e;
+      chart.view.zoomY = szy + (tzy - szy) * e;
       this.sendViewTransform(chart);
       this.drawChart(chart);
       if (this._syncViews) this.syncAllViews(chart);
       if (t < 1) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
+  }
+
+  setHiddenSeries(id: string, hidden: number[]): void {
+    const chart = this.charts.get(id);
+    if (!chart) return;
+    chart.config.hiddenSeries = new Set(hidden);
+    this.worker?.postMessage({
+      type: M.SET_STYLE,
+      id,
+      hiddenSeries: chart.config.hiddenSeries,
+    });
+    this.drawChart(chart);
   }
 
   requestRender(id: string): void {

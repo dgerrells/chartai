@@ -21,6 +21,21 @@ declare module "../types.ts" {
   }
 }
 
+function computeHomeView(width: number, height: number) {
+  const l = 32,
+    t = 8,
+    r = 8,
+    b = 48;
+  const innerW = width - l - r;
+  const innerH = height - t - b;
+  return {
+    panX: innerW > 0 ? -l / innerW : 0,
+    panY: innerH > 0 ? -b / innerH : 0,
+    zoomX: innerW > 0 ? innerW / width : 1,
+    zoomY: innerH > 0 ? innerH / height : 1,
+  };
+}
+
 const niceTicks = (min: number, max: number, count: number) => {
   const range = max - min;
   if (range <= 0) return [min];
@@ -68,7 +83,26 @@ const getViewState = (chart: InternalChart<ChartConfig & LabelsConfig>) => {
 export const labelsPlugin: ChartPlugin<LabelsConfig> = {
   name: "labels",
 
+  install(chart) {
+    const hv = computeHomeView(chart.width, chart.height);
+    chart.homeView = hv;
+    chart.view = { ...hv };
+    ChartManager.requestRender(chart.id);
+  },
+
   beforeDraw(ctx, chart) {
+    const hv = computeHomeView(chart.width, chart.height);
+    const old = chart.homeView;
+    chart.homeView = hv;
+    if (
+      hv.zoomX !== old.zoomX ||
+      hv.zoomY !== old.zoomY ||
+      hv.panX !== old.panX ||
+      hv.panY !== old.panY
+    ) {
+      chart.view = { ...hv };
+      ChartManager.requestRender(chart.id);
+    }
     const { w, h, m, rx, ry, mx, my, grid } = getViewState(chart);
     ctx.strokeStyle = grid;
     ctx.lineWidth = 1;
