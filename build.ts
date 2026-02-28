@@ -344,6 +344,9 @@ async function buildPages() {
   fs.rmSync(PAGES, { recursive: true, force: true });
   fs.mkdirSync(PAGES, { recursive: true });
 
+  // Prevent GitHub Pages from running Jekyll on our pre-built files
+  fs.writeFileSync(path.join(PAGES, ".nojekyll"), "");
+
   // Bundle main.ts (landing page - pulls in chart-library)
   const main = await Bun.build({
     entrypoints: [path.join(ROOT, "pages", "main.ts")],
